@@ -1,0 +1,35 @@
+name: Validate Submodules
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: purple-mcp-validate-submodules-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  validate-submodules:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+
+      - name: Fetch tags in submodules
+        run: |
+          git submodule foreach 'git fetch --tags'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Validate submodule versions
+        run: |
+          uv run --group test scripts/validate_submodules.py --verbose

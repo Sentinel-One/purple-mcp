@@ -1,0 +1,106 @@
+[project]
+name = "purple-mcp"
+version = "0.5.0"
+description = "Purple AI MCP Server"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "License :: OSI Approved :: MIT License",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Development Status :: 4 - Beta"
+]
+dependencies = [
+    "click>=8.1",
+    "fastmcp>=2.13.0.2",
+    "httpx>=0.27",
+    "logfire[httpx,starlette]>=4.3",
+    "pandas>=2.3.3",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.10",
+    "python-dateutil>=2.8",
+    "tenacity>=8.5",
+    "typing-extensions>=4.12"
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.18.2",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "respx>=0.22.0",
+    "ruff>=0.14.3",
+    "types-python-dateutil>=2.9.0.20250708",
+]
+test = [
+    "freezegun>=1.5.3",
+    "pydantic-ai>=1.9.1",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
+    "pytest-cov>=6.2.1",
+    "pytest-rerunfailures>=16.1",
+    "pytest-xdist>=3.8.0",
+    "respx>=0.22.0",
+]
+
+[tool.uv]
+resolution = "lowest-direct"
+
+[project.scripts]
+purple-mcp = "purple_mcp.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/purple_mcp"]
+
+[tool.mypy]
+files = ["src", "tests"]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+allow_redefinition_new = true
+local_partial_types = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+plugins = ["pydantic.mypy"]
+mypy_path = ["src", "."]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disable_error_code = ["misc"]
+
+# Logging security module intentionally monkey-patches logging.LogRecord.getMessage()
+# to inject secret redaction into the logging flow. This is the only reliable way to
+# ensure secrets are redacted after message formatting but before output.
+[[tool.mypy.overrides]]
+module = "purple_mcp.logging_security"
+disable_error_code = ["method-assign"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = [
+    "--strict-config",
+    "--strict-markers",
+    "-ra",
+    "--tb=short",
+    "--durations=10",
+]
+xfail_strict = true

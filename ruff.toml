@@ -1,0 +1,155 @@
+lint.select = [
+    "ANN",    # flake8-annotations: Enforces type annotations on functions and methods
+    "F",      # pyflakes: Catches unused imports, undefined names, and other basic errors
+    "E",      # pycodestyle: Enforces PEP 8 style guidelines (errors)
+    "D",      # pydocstyle: Enforces docstring conventions
+    "W",      # pycodestyle: Enforces PEP 8 style guidelines (warnings)
+    "Q",      # flake8-quotes: Enforces consistent quote usage
+    "N",      # pep8-naming: Enforces PEP 8 naming conventions
+    "B",      # flake8-bugbear: Finds likely bugs and design problems
+    "UP",     # pyupgrade: Suggests modern Python syntax improvements
+    "RUF",    # ruff: Ruff-specific rules
+    "C4",     # flake8-comprehensions: Suggests more efficient list/dict comprehensions
+    "C90",    # mccabe: Measures cyclomatic complexity
+    "PTH",    # flake8-use-pathlib: Encourages pathlib over os.path
+    "SIM",    # flake8-simplify: Suggests code simplifications
+    "TID",    # flake8-tidy-imports: Enforces import organization
+    "I",      # isort: Sorts imports
+    "NPY",    # NumPy-specific rules: NumPy best practices
+    "RET501", # unnecessary-return-none: Removes unnecessary return None
+    "RET502", # implicit-return-value: Requires explicit return values
+    "RET503", # implicit-return: Requires explicit return statements
+    "INP001", # implicit-namespace-package: Requires __init__.py files
+    "PGH",    # pygrep-hooks: Miscellaneous linting rules
+    "LOG",    # flake8-logging: Miscellaneous logging checks
+    "G",      # flake8-logging-format: Miscellaneous logging checks
+]
+
+lint.ignore = [
+    "F403",   # star-imports: Allows `from module import *`
+    "E402",   # module-import-not-at-top-of-file: Allows imports not at file top
+    "E501",   # line-too-long: Disables line length limit (handled by formatter)
+    "W191",   # tab-indentation: Allows tab indentation
+    "E111",   # indentation-with-invalid-multiple: Allows non-4-space indentation
+    "E114",   # indentation-with-invalid-multiple-comment: Allows comment indentation issues
+    "E117",   # over-indented: Allows over-indentation (formatter handles this)
+    "D206",   # indent-with-spaces: Allows docstring indentation issues (formatter handles this)
+    "D300",   # triple-single-quotes: Allows single quotes in docstrings (formatter handles this)
+    "Q000",   # bad-quotes-inline-string: Allows inconsistent quote usage (formatter handles this)
+    "Q001",   # bad-quotes-multiline-string: Allows inconsistent multiline quotes (formatter handles this)
+    "Q002",   # bad-quotes-docstring: Allows inconsistent docstring quotes (formatter handles this)
+    "Q003",   # avoidable-escaped-quote: Allows escaped quotes (formatter handles this)
+    "COM812", # missing-trailing-comma: Allows missing trailing commas (formatter handles this)
+    "COM819", # prohibited-trailing-comma: Allows prohibited trailing commas (formatter handles this)
+    "ISC001", # single-line-implicit-string-concatenation: Allows implicit string concat (formatter handles this)
+    "ISC002", # multi-line-implicit-string-concatenation: Allows multiline implicit string concat (formatter handles this)
+    "ANN401", # any-type: Allows usage of `typing.Any` in type annotations
+    "SIM112", # uncapitalized-environment-variables: Allows lowercase environment variable names
+    "SIM910", # dict-get-with-none-default: Allows dict.get() with None default for clarity
+    "UP015",  # redundant-open-modes: Allows explicit file open modes for clarity
+]
+
+lint.fixable = [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "I",
+    "N",
+    "Q",
+    "S",
+    "T",
+    "W",
+    "ANN",
+    "ARG",
+    "BLE",
+    "COM",
+    "DJ",
+    "DTZ",
+    "EM",
+    "ERA",
+    "EXE",
+    "FBT",
+    "ICN",
+    "INP",
+    "ISC",
+    "NPY",
+    "PD",
+    "PGH",
+    "PIE",
+    "PL",
+    "PT",
+    "PTH",
+    "PYI",
+    "RET",
+    "RSE",
+    "RUF",
+    "SIM",
+    "SLF",
+    "TCH",
+    "TID",
+    "TRY",
+    "UP",
+    "YTT",
+]
+exclude = [
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".tox",
+    ".venv",
+    "*.ipynb",
+    "__pypackages__",
+    "_build",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    "notebooks",
+    "ext",
+    "deps",
+    "migrations",
+    ".terraform",
+    "backups",
+]
+target-version = "py310"
+line-length = 99
+lint.unfixable = []
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+docstring-code-format = true
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]  # unused-import: Allow unused imports in __init__.py files
+"src/indigo_workshop/**" = ["C901"]  # complex-structure: Allow complex functions in workshop code
+
+[lint.isort]
+combine-as-imports = true
+force-wrap-aliases = true
+force-sort-within-sections = false
+split-on-trailing-comma = false
+
+[lint.mccabe]
+max-complexity = 10
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[lint.flake8-quotes]
+docstring-quotes = "double"
+
+[lint.flake8-bugbear]
+extend-immutable-calls = ["typer.Argument", "fastapi.Depends"]
+
+[lint.flake8-annotations]
+mypy-init-return = true
