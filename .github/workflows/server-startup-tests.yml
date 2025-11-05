@@ -1,0 +1,111 @@
+name: Server Startup
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: purple-mcp-server-startup-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  server-startup-tests:
+    # Skip this job for fork PRs since secrets aren't available
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+      fail-fast: false
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Test stdio mode
+        run: |
+          # Start the server in stdio mode and send a simple MCP initialize request
+          # The server should respond with an initialize response and then we send initialized notification
+          set +e
+          (sleep 2 && echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test-client", "version": "1.0.0"}}}' && sleep 1 && echo '{"jsonrpc": "2.0", "method": "notifications/initialized"}' && sleep 1) | timeout 20 uv run --python=${{ matrix.python-version }} purple-mcp --mode stdio
+          exit_code=$?
+          set -e
+
+          # Exit code 124 means timeout (success - server stayed alive)
+          # Exit code 0 or 141 (SIGPIPE) means server exited cleanly after processing input
+          if [ $exit_code -eq 0 ] || [ $exit_code -eq 141 ] || [ $exit_code -eq 124 ]; then
+            echo "✓ STDIO mode started successfully"
+            exit 0
+          else
+            echo "✗ STDIO mode failed with exit code $exit_code"
+            exit 1
+          fi
+        env:
+          PURPLEMCP_CONSOLE_TOKEN: ${{ secrets.CONSOLE_TOKEN }}
+          PURPLEMCP_CONSOLE_BASE_URL: ${{ secrets.CONSOLE_BASE_URL }}
+
+      - name: Test SSE mode
+        run: |
+          # Start the server in background
+          uv run --python=${{ matrix.python-version }} purple-mcp --mode sse --host localhost --port 8001 &
+          SERVER_PID=$!
+
+          # Give the server time to start (longer for Python 3.14 due to potential builds)
+          sleep 20
+
+          # Check if server is still running
+          if ! kill -0 $SERVER_PID 2>/dev/null; then
+            echo "✗ SSE mode server failed to start"
+            exit 1
+          fi
+
+          # Try to connect to the health endpoint
+          if curl -f http://localhost:8001/health 2>/dev/null; then
+            echo "✓ SSE mode started successfully and health check passed"
+            kill $SERVER_PID
+            exit 0
+          else
+            echo "✗ SSE mode health check failed"
+            kill $SERVER_PID
+            exit 1
+          fi
+        env:
+          PURPLEMCP_CONSOLE_TOKEN: ${{ secrets.CONSOLE_TOKEN }}
+          PURPLEMCP_CONSOLE_BASE_URL: ${{ secrets.CONSOLE_BASE_URL }}
+
+      - name: Test streamable-http mode
+        run: |
+          # Start the server in background
+          uv run --python=${{ matrix.python-version }} purple-mcp --mode streamable-http --host localhost --port 8002 &
+          SERVER_PID=$!
+
+          # Give the server time to start (longer for Python 3.14 due to potential builds)
+          sleep 20
+
+          # Check if server is still running
+          if ! kill -0 $SERVER_PID 2>/dev/null; then
+            echo "✗ Streamable-HTTP mode server failed to start"
+            exit 1
+          fi
+
+          # Try to connect to the health endpoint
+          if curl -f http://localhost:8002/health 2>/dev/null; then
+            echo "✓ Streamable-HTTP mode started successfully and health check passed"
+            kill $SERVER_PID
+            exit 0
+          else
+            echo "✗ Streamable-HTTP mode health check failed"
+            kill $SERVER_PID
+            exit 1
+          fi
+        env:
+          PURPLEMCP_CONSOLE_TOKEN: ${{ secrets.CONSOLE_TOKEN }}
+          PURPLEMCP_CONSOLE_BASE_URL: ${{ secrets.CONSOLE_BASE_URL }}

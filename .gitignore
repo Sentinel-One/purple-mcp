@@ -1,0 +1,17 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.DS_Store
+.idea
+/.env
+/settings.json
+/.env.test
+/.coverage
+/coverage.xml

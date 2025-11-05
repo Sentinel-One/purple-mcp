@@ -1,0 +1,6 @@
+[submodule "deps/fastmcp"]
+	path = deps/fastmcp
+	url = https://github.com/jlowin/fastmcp.git
+[submodule "deps/pydantic-ai"]
+	path = deps/pydantic-ai
+	url = https://github.com/pydantic/pydantic-ai.git
