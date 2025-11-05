@@ -1,4 +1,4 @@
-<img src="https://www.sentinelone.com/wp-content/themes/sentinelone/assets/svg/header-logo-dark.svg" />
+<img src="https://your-url/logo.svg" style="filter: drop-shadow(0 0 15px rgba(255,255,255,0.9))" />
 
 # Purple AI MCP Server
 
