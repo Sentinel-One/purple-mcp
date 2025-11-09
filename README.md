@@ -41,6 +41,25 @@ export PURPLEMCP_CONSOLE_BASE_URL="https://your-console.sentinelone.net"
 uvx --from git+https://github.com/Sentinel-One/purple-mcp.git purple-mcp --mode=stdio
 ```
 
+### Using Docker
+
+```bash
+# Build the image
+docker build -t purple-mcp:latest .
+
+# Run with your credentials
+export PURPLEMCP_CONSOLE_TOKEN="your_token"
+export PURPLEMCP_CONSOLE_BASE_URL="https://your-console.sentinelone.net"
+
+docker run -p 8000:8000 \
+  -e PURPLEMCP_CONSOLE_TOKEN \
+  -e PURPLEMCP_CONSOLE_BASE_URL \
+  purple-mcp:latest \
+  --mode streamable-http
+```
+
+For production deployments, see [Deployment Guide](DOCKER.md).
+
 **Note:** Purple AI MCP does not include built-in authentication. For network-exposed deployments, place it behind a reverse proxy or load balancer. See [Production Setup](PRODUCTION_SETUP.md) for cloud load balancer configurations (AWS ALB, GCP Cloud Load Balancing, Azure Application Gateway) or nginx examples for self-hosted deployments.
 
 ---

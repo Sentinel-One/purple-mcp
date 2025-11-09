@@ -20,11 +20,14 @@ docker compose version  # Should show v2.0.0+
 
 ## Quick Reference
 
-Pre-built images: `ghcr.io/sentinel-one/purple-mcp:latest`
+Build the image locally before deployment:
 
 ```bash
-docker pull ghcr.io/sentinel-one/purple-mcp:latest
-docker compose pull
+# Build the image
+docker build -t purple-mcp:latest .
+
+# Or use docker compose to build
+docker compose build
 ```
 
 ## Quick Start
