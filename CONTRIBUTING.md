@@ -100,6 +100,35 @@ git clone --recurse-submodules <repository-url>
 
 **Note**: All submodules use HTTPS URLs for consistent access without SSH keys.
 
+### Docker
+
+Build and run the Docker image locally:
+
+```bash
+# Build locally
+DOCKER_BUILDKIT=1 docker build -t purple-mcp:dev .
+
+# Test a specific mode
+export PURPLEMCP_CONSOLE_TOKEN="your_token"
+export PURPLEMCP_CONSOLE_BASE_URL="https://your-console.sentinelone.net"
+
+docker run -p 8000:8000 \
+  -e PURPLEMCP_CONSOLE_TOKEN \
+  -e PURPLEMCP_CONSOLE_BASE_URL \
+  purple-mcp:dev \
+  --mode streamable-http
+
+# Test all modes with compose
+cat > .env << EOF
+PURPLEMCP_CONSOLE_TOKEN=your_token
+PURPLEMCP_CONSOLE_BASE_URL=https://your-console.sentinelone.net
+EOF
+
+docker compose --profile all up
+```
+
+Note: Production-ready images are published to `ghcr.io/sentinel-one/purple-mcp` on on release tags. See [DOCKER.md](DOCKER.md) for deployment options and [PRODUCTION_SETUP.md](PRODUCTION_SETUP.md) for production with authentication.
+
 ## Architecture: Tools vs Libraries
 
 Purple MCP follows a strict separation between **libraries** (`libs/`) and **tools** (`tools/`). Understanding this distinction is crucial for contributors:

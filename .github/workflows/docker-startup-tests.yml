@@ -1,0 +1,504 @@
+name: Docker Startup
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - docker-compose.yml
+      - docker-entrypoint.sh
+      - pyproject.toml
+      - src/**
+      - .github/workflows/docker-startup-tests.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - docker-compose.yml
+      - docker-entrypoint.sh
+      - pyproject.toml
+      - src/**
+      - .github/workflows/docker-startup-tests.yml
+  workflow_dispatch:
+
+concurrency:
+  group: purple-mcp-docker-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  docker-build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache
+          tags: purple-mcp:test
+          load: true
+
+  docker-sse-test:
+    name: Test SSE Mode
+    needs: docker-build
+    # Skip this job for fork PRs since secrets aren't available
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Mask secrets
+        run: |
+          echo "::add-mask::${{ secrets.CONSOLE_TOKEN }}"
+          echo "::add-mask::${{ secrets.CONSOLE_BASE_URL }}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: purple-mcp:sse-test
+          load: true
+
+      - name: Test SSE mode startup
+        run: |
+          # Start container in background
+          docker run \
+            --rm \
+            --detach \
+            --name purple-mcp-sse-test \
+            -p 8000:8000 \
+            -e PURPLEMCP_CONSOLE_TOKEN="${{ secrets.CONSOLE_TOKEN }}" \
+            -e PURPLEMCP_CONSOLE_BASE_URL="${{ secrets.CONSOLE_BASE_URL }}" \
+            -e MCP_MODE=sse \
+            purple-mcp:sse-test
+
+          # Wait for server to start with retry logic
+          echo "Waiting for SSE server to become healthy..."
+          for i in {1..10}; do
+            if docker ps --filter name=purple-mcp-sse-test --format "{{.Names}}" | grep -q purple-mcp-sse-test; then
+              if curl --retry 3 --retry-delay 2 --retry-connrefused -f http://localhost:8000/health 2>/dev/null; then
+                echo "✓ SSE mode started successfully and health check passed"
+                break
+              fi
+            else
+              echo "✗ SSE mode container exited unexpectedly"
+              docker logs purple-mcp-sse-test
+              exit 1
+            fi
+            if [ $i -eq 10 ]; then
+              echo "✗ SSE mode health check failed after retries"
+              docker logs purple-mcp-sse-test
+              docker stop purple-mcp-sse-test || true
+              exit 1
+            fi
+            sleep 2
+          done
+
+          # Cleanup
+          docker stop purple-mcp-sse-test
+
+  docker-streamable-http-test:
+    name: Test Streamable-HTTP Mode
+    needs: docker-build
+    # Skip this job for fork PRs since secrets aren't available
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Mask secrets
+        run: |
+          echo "::add-mask::${{ secrets.CONSOLE_TOKEN }}"
+          echo "::add-mask::${{ secrets.CONSOLE_BASE_URL }}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: purple-mcp:streamable-http-test
+          load: true
+
+      - name: Test streamable-http mode startup
+        run: |
+          # Start container in background
+          docker run \
+            --rm \
+            --detach \
+            --name purple-mcp-streamable-http-test \
+            -p 8001:8001 \
+            -e PURPLEMCP_CONSOLE_TOKEN="${{ secrets.CONSOLE_TOKEN }}" \
+            -e PURPLEMCP_CONSOLE_BASE_URL="${{ secrets.CONSOLE_BASE_URL }}" \
+            -e MCP_MODE=streamable-http \
+            -e MCP_PORT=8001 \
+            purple-mcp:streamable-http-test
+
+          # Wait for server to start with retry logic
+          echo "Waiting for Streamable-HTTP server to become healthy..."
+          for i in {1..10}; do
+            if docker ps --filter name=purple-mcp-streamable-http-test --format "{{.Names}}" | grep -q purple-mcp-streamable-http-test; then
+              if curl --retry 3 --retry-delay 2 --retry-connrefused -f http://localhost:8001/health 2>/dev/null; then
+                echo "✓ Streamable-HTTP mode started successfully and health check passed"
+                break
+              fi
+            else
+              echo "✗ Streamable-HTTP mode container exited unexpectedly"
+              docker logs purple-mcp-streamable-http-test
+              exit 1
+            fi
+            if [ $i -eq 10 ]; then
+              echo "✗ Streamable-HTTP mode health check failed after retries"
+              docker logs purple-mcp-streamable-http-test
+              docker stop purple-mcp-streamable-http-test || true
+              exit 1
+            fi
+            sleep 2
+          done
+
+          # Cleanup
+          docker stop purple-mcp-streamable-http-test
+
+  docker-stdio-test:
+    name: Test STDIO Mode
+    needs: docker-build
+    # Skip this job for fork PRs since secrets aren't available
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Mask secrets
+        run: |
+          echo "::add-mask::${{ secrets.CONSOLE_TOKEN }}"
+          echo "::add-mask::${{ secrets.CONSOLE_BASE_URL }}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: purple-mcp:stdio-test
+          load: true
+
+      - name: Test STDIO mode startup
+        run: |
+          # Send MCP initialize request and wait for response
+          set +e
+          (sleep 2 && echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test-client", "version": "1.0.0"}}}' && sleep 1 && echo '{"jsonrpc": "2.0", "method": "notifications/initialized"}' && sleep 1) | timeout 20 docker run \
+            --rm \
+            -i \
+            -e PURPLEMCP_CONSOLE_TOKEN="${{ secrets.CONSOLE_TOKEN }}" \
+            -e PURPLEMCP_CONSOLE_BASE_URL="${{ secrets.CONSOLE_BASE_URL }}" \
+            purple-mcp:stdio-test \
+            --mode stdio
+          exit_code=$?
+          set -e
+
+          # Exit code 124 means timeout (success - server stayed alive)
+          # Exit code 0 or 141 (SIGPIPE) means server exited cleanly after processing input
+          if [ $exit_code -eq 0 ] || [ $exit_code -eq 141 ] || [ $exit_code -eq 124 ]; then
+            echo "✓ STDIO mode started successfully"
+            exit 0
+          else
+            echo "✗ STDIO mode failed with exit code $exit_code"
+            exit 1
+          fi
+
+  docker-entrypoint-loopback-test:
+    name: Test Entrypoint Loopback Detection
+    needs: docker-build
+    # Skip this job for fork PRs since secrets aren't available
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Mask secrets
+        run: |
+          echo "::add-mask::${{ secrets.CONSOLE_TOKEN }}"
+          echo "::add-mask::${{ secrets.CONSOLE_BASE_URL }}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: purple-mcp:entrypoint-test
+          load: true
+
+      - name: Test loopback address detection (127.0.0.1)
+        run: |
+          # Replace python with a fake that echoes args - entrypoint execs python so we intercept to see the command it builds
+          cat > fake-python << 'EOF'
+          #!/bin/sh
+          echo "python $@"
+          EOF
+          chmod +x fake-python
+
+          # Test with 127.0.0.1 (should NOT have --allow-remote-access)
+          output=$(docker run --rm \
+            -v $(pwd)/fake-python:/app/.venv/bin/python:ro \
+            -e MCP_MODE=streamable-http \
+            -e MCP_HOST=127.0.0.1 \
+            purple-mcp:entrypoint-test)
+
+          echo "$output"
+          if echo "$output" | grep -q "allow-remote-access"; then
+            echo "✗ ERROR: 127.0.0.1 should NOT trigger --allow-remote-access"
+            exit 1
+          fi
+          echo "✓ 127.0.0.1 correctly does NOT trigger remote access"
+
+      - name: Test loopback address detection (::1)
+        run: |
+          # Test with ::1 (should NOT have --allow-remote-access)
+          output=$(docker run --rm \
+            -v $(pwd)/fake-python:/app/.venv/bin/python:ro \
+            -e MCP_MODE=streamable-http \
+            -e MCP_HOST=::1 \
+            purple-mcp:entrypoint-test)
+
+          echo "$output"
+          if echo "$output" | grep -q "allow-remote-access"; then
+            echo "✗ ERROR: ::1 should NOT trigger --allow-remote-access"
+            exit 1
+          fi
+          echo "✓ ::1 correctly does NOT trigger remote access"
+
+      - name: Test localhost detection
+        run: |
+          # Test with localhost (should NOT have --allow-remote-access)
+          output=$(docker run --rm \
+            -v $(pwd)/fake-python:/app/.venv/bin/python:ro \
+            -e MCP_MODE=streamable-http \
+            -e MCP_HOST=localhost \
+            purple-mcp:entrypoint-test)
+
+          echo "$output"
+          if echo "$output" | grep -q "allow-remote-access"; then
+            echo "✗ ERROR: localhost should NOT trigger --allow-remote-access"
+            exit 1
+          fi
+          echo "✓ localhost correctly does NOT trigger remote access"
+
+      - name: Test non-loopback address detection (0.0.0.0)
+        run: |
+          # Test with 0.0.0.0 (SHOULD have --allow-remote-access)
+          output=$(docker run --rm \
+            -v $(pwd)/fake-python:/app/.venv/bin/python:ro \
+            -e MCP_MODE=streamable-http \
+            -e MCP_HOST=0.0.0.0 \
+            purple-mcp:entrypoint-test)
+
+          echo "$output"
+          if ! echo "$output" | grep -q "allow-remote-access"; then
+            echo "✗ ERROR: 0.0.0.0 SHOULD trigger --allow-remote-access"
+            exit 1
+          fi
+          echo "✓ 0.0.0.0 correctly triggers remote access"
+
+  docker-proxy-test:
+    name: Test Production Proxy Configuration
+    needs: docker-build
+    # Skip this job for fork PRs since secrets aren't available
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Mask secrets
+        run: |
+          echo "::add-mask::${{ secrets.CONSOLE_TOKEN }}"
+          echo "::add-mask::${{ secrets.CONSOLE_BASE_URL }}"
+          echo "::add-mask::test-token-12345"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Generate test SSL certificates
+        run: |
+          mkdir -p ssl
+          openssl req -x509 -newkey rsa:2048 \
+            -keyout ssl/key.pem \
+            -out ssl/cert.pem \
+            -days 1 -nodes \
+            -subj "/CN=localhost"
+          chmod 644 ssl/key.pem ssl/cert.pem
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: purple-mcp:proxy-test
+          load: true
+
+      - name: Validate test token characteristics
+        run: |
+          TEST_TOKEN="test-token-12345"
+
+          # Verify token contains only safe characters (alphanumeric, dash, underscore, plus, slash, equals)
+          # This is a basic whitelist for base64/hex tokens
+          if ! echo "$TEST_TOKEN" | grep -qE '^[A-Za-z0-9+/=_-]+$'; then
+            echo "✗ ERROR: Test token contains invalid characters"
+            echo "Token should only contain: A-Z, a-z, 0-9, +, /, =, _, -"
+            exit 1
+          fi
+          echo "✓ Test token character validation passed"
+
+          # Warn if token is too short (less than 16 characters is weak)
+          if [ ${#TEST_TOKEN} -lt 16 ]; then
+            echo "⚠ WARNING: Test token is short (${#TEST_TOKEN} chars). Production tokens should be 32+ bytes (44+ chars base64)"
+          fi
+
+      - name: Test proxy configuration
+        run: |
+          export PURPLEMCP_AUTH_TOKEN="test-token-12345"
+          export PURPLEMCP_CONSOLE_TOKEN="${{ secrets.CONSOLE_TOKEN }}"
+          export PURPLEMCP_CONSOLE_BASE_URL="${{ secrets.CONSOLE_BASE_URL }}"
+
+          # Verify token was substituted correctly in the generated config
+          GENERATED_CONFIG=$(docker run --rm \
+            -v $(pwd)/deploy/nginx/nginx.conf.template:/tmp/nginx.conf.template:ro \
+            -e PURPLEMCP_AUTH_TOKEN \
+            nginx:1.27-alpine sh -c 'envsubst "\$PURPLEMCP_AUTH_TOKEN" < /tmp/nginx.conf.template')
+
+          # Verify placeholder was replaced
+          if echo "$GENERATED_CONFIG" | grep -q '\${PURPLEMCP_AUTH_TOKEN}'; then
+            echo "✗ ERROR: Token placeholder was not substituted"
+            exit 1
+          fi
+
+          # Verify actual token value is present
+          if ! echo "$GENERATED_CONFIG" | grep -q "test-token-12345"; then
+            echo "✗ ERROR: Token value not found in generated config"
+            exit 1
+          fi
+
+          echo "✓ Token substitution verification passed"
+
+          timeout 30 docker compose --profile production up -d || {
+            echo "✗ Failed to start services"
+            docker compose logs
+            exit 1
+          }
+
+          # Wait for services to be healthy with retry logic
+          echo "Waiting for services to start..."
+          for i in {1..15}; do
+            if docker compose ps | grep -q "purple-mcp-streamable-http" && \
+               docker compose ps | grep -q "purple-mcp-proxy"; then
+              echo "✓ Services started"
+              break
+            fi
+            if [ $i -eq 15 ]; then
+              echo "✗ Services did not start in time"
+              docker compose logs
+              docker compose down
+              exit 1
+            fi
+            sleep 2
+          done
+
+          # Check if services are running
+          if ! docker compose ps | grep -q purple-mcp-streamable-http; then
+            echo "✗ MCP service is not running"
+            docker compose logs purple-mcp-streamable-http
+            docker compose down
+            exit 1
+          fi
+
+          if ! docker compose ps | grep -q purple-mcp-proxy; then
+            echo "✗ Proxy service is not running"
+            docker compose logs purple-mcp-proxy
+            docker compose down
+            exit 1
+          fi
+
+          echo "✓ Proxy configuration is valid and services are running"
+
+          # Wait for backend to become healthy
+          echo "Waiting for backend to become healthy..."
+          for i in {1..30}; do
+            if docker compose ps purple-mcp-streamable-http | grep -q "healthy"; then
+              echo "✓ Backend is healthy"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "✗ Backend did not become healthy in time"
+              docker compose logs purple-mcp-streamable-http
+              docker compose down
+              exit 1
+            fi
+            sleep 1
+          done
+
+          # Test authentication: 401 without Authorization header
+          echo "Testing auth: expecting 401 without auth header..."
+          http_code=$(curl -k -s -o /dev/null -w "%{http_code}" --max-time 10 https://localhost/)
+          if [ "$http_code" != "401" ]; then
+            echo "✗ Expected 401 without auth header, got $http_code"
+            docker compose logs
+            docker compose down
+            exit 1
+          fi
+          echo "✓ Correctly returns 401 without auth header"
+
+          # Test authentication: 403 with invalid token
+          echo "Testing auth: expecting 403 with invalid token..."
+          http_code=$(curl -k -s -o /dev/null -w "%{http_code}" --max-time 10 -H "Authorization: Bearer invalid-token" https://localhost/)
+          if [ "$http_code" != "403" ]; then
+            echo "✗ Expected 403 with invalid token, got $http_code"
+            docker compose logs
+            docker compose down
+            exit 1
+          fi
+          echo "✓ Correctly returns 403 with invalid token"
+
+          # Test authentication: 200 with valid token (health endpoint)
+          echo "Testing auth: expecting 200 with valid token..."
+          http_code=$(curl -k -s -o /dev/null -w "%{http_code}" --max-time 10 -H "Authorization: Bearer test-token-12345" https://localhost/health)
+          if [ "$http_code" != "200" ]; then
+            echo "✗ Expected 200 with valid token, got $http_code"
+            docker compose logs
+            docker compose down
+            exit 1
+          fi
+          echo "✓ Correctly returns 200 with valid token"
+
+          echo "✓ All authentication checks passed"
+          docker compose down

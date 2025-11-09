@@ -1,0 +1,61 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Version control
+.github
+.gitlab-ci.yml
+.circleci
+
+# Development
+.venv
+venv
+.env
+.env.*
+!.env.example
+*.pyc
+__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.egg-info
+dist
+build
+.tox
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+htmlcov
+.coverage
+.coverage.*
+*.cover
+.hypothesis
+
+# Documentation
+docs/_build
+*.md
+!README.md
+
+# Docker
+Dockerfile*
+docker-compose.yml
+docker-compose.*.yml
+.dockerignore
+# docker-entrypoint.sh is intentionally included
+
+# CI/CD
+.github/workflows
+
+# Misc
+CONTRIBUTING.md
+SECURITY.md
+AGENTS.md
+CLAUDE.md

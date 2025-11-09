@@ -27,6 +27,8 @@ Purple AI MCP is a read-only service - you cannot make changes to your account o
 
 ## Quick Start
 
+### Using uv (Recommended for Local Development or Deployment)
+
 ```bash
 # Install uv if you don't have it
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -38,6 +40,27 @@ export PURPLEMCP_CONSOLE_BASE_URL="https://your-console.sentinelone.net"
 # Run
 uvx --from git+https://github.com/Sentinel-One/purple-mcp.git purple-mcp --mode=stdio
 ```
+
+### Using Docker
+
+```bash
+export PURPLEMCP_CONSOLE_TOKEN="your_token"
+export PURPLEMCP_CONSOLE_BASE_URL="https://your-console.sentinelone.net"
+
+docker run -p 8000:8000 \
+  -e PURPLEMCP_CONSOLE_TOKEN \
+  -e PURPLEMCP_CONSOLE_BASE_URL \
+  ghcr.io/sentinel-one/purple-mcp:latest \
+  --mode streamable-http
+```
+
+Images are published to [`ghcr.io/sentinel-one/purple-mcp`](https://github.com/Sentinel-One/purple-mcp/pkgs/container/purple-mcp) on release tags.
+
+For production deployments, see [Deployment Guide](DOCKER.md).
+
+**Note:** Purple AI MCP does not include built-in authentication. For network-exposed deployments, place it behind a reverse proxy or load balancer. See [Production Setup](PRODUCTION_SETUP.md) for cloud load balancer configurations (AWS ALB, GCP Cloud Load Balancing, Azure Application Gateway) or nginx examples for self-hosted deployments.
+
+---
 
 Your token needs Account or Site level permissions (not Global). Get one from Policy & Settings → User Management → Service Users in your console.  Currently, this server only supports tokens that have access to a single Account or Site.  If you need to access multiple sites, you will need to run multiple MCP servers with Account-specific or Site-specific tokens.
 

@@ -15,3 +15,11 @@ wheels/
 /.env.test
 /.coverage
 /coverage.xml
+
+# SSL and production files
+/ssl/
+*.pem
+*.key
+*.crt
+.env.production
+.env.local

@@ -1,0 +1,118 @@
+services:
+  purple-mcp-sse:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: purple-mcp-sse
+    environment:
+      MCP_MODE: sse
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8000
+      # Required: SentinelOne Console configuration
+      PURPLEMCP_CONSOLE_BASE_URL: ${PURPLEMCP_CONSOLE_BASE_URL}
+      PURPLEMCP_CONSOLE_TOKEN: ${PURPLEMCP_CONSOLE_TOKEN}
+
+      # Optional: Observability
+      PURPLEMCP_ENV: ${PURPLEMCP_ENV:-production}
+      PURPLEMCP_LOGFIRE_TOKEN: ${PURPLEMCP_LOGFIRE_TOKEN:-}
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    profiles:
+      - sse
+      - all
+
+  purple-mcp-streamable-http:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: purple-mcp-streamable-http
+    environment:
+      MCP_MODE: streamable-http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8000
+      # Required: SentinelOne Console configuration
+      PURPLEMCP_CONSOLE_BASE_URL: ${PURPLEMCP_CONSOLE_BASE_URL}
+      PURPLEMCP_CONSOLE_TOKEN: ${PURPLEMCP_CONSOLE_TOKEN}
+      # Optional: Custom GraphQL endpoints
+      PURPLEMCP_CONSOLE_GRAPHQL_ENDPOINT: ${PURPLEMCP_CONSOLE_GRAPHQL_ENDPOINT:-/web/api/v2.1/graphql}
+      PURPLEMCP_ALERTS_GRAPHQL_ENDPOINT: ${PURPLEMCP_ALERTS_GRAPHQL_ENDPOINT:-/web/api/v2.1/unifiedalerts/graphql}
+      PURPLEMCP_MISCONFIGURATIONS_GRAPHQL_ENDPOINT: ${PURPLEMCP_MISCONFIGURATIONS_GRAPHQL_ENDPOINT:-/web/api/v2.1/xspm/findings/misconfigurations/graphql}
+      PURPLEMCP_VULNERABILITIES_GRAPHQL_ENDPOINT: ${PURPLEMCP_VULNERABILITIES_GRAPHQL_ENDPOINT:-/web/api/v2.1/xspm/findings/vulnerabilities/graphql}
+      PURPLEMCP_INVENTORY_RESTAPI_ENDPOINT: ${PURPLEMCP_INVENTORY_RESTAPI_ENDPOINT:-/web/api/v2.1/xdr/assets}
+      # Optional: Observability
+      PURPLEMCP_ENV: ${PURPLEMCP_ENV:-production}
+      PURPLEMCP_LOGFIRE_TOKEN: ${PURPLEMCP_LOGFIRE_TOKEN:-}
+    ports:
+      - "8001:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    profiles:
+      - streamable-http
+      - production
+      - all
+
+  purple-mcp-stdio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: purple-mcp-stdio
+    environment:
+      MCP_MODE: stdio
+      # Required: SentinelOne Console configuration
+      PURPLEMCP_CONSOLE_BASE_URL: ${PURPLEMCP_CONSOLE_BASE_URL}
+      PURPLEMCP_CONSOLE_TOKEN: ${PURPLEMCP_CONSOLE_TOKEN}
+      # Optional: Custom GraphQL endpoints
+      PURPLEMCP_CONSOLE_GRAPHQL_ENDPOINT: ${PURPLEMCP_CONSOLE_GRAPHQL_ENDPOINT:-/web/api/v2.1/graphql}
+      PURPLEMCP_ALERTS_GRAPHQL_ENDPOINT: ${PURPLEMCP_ALERTS_GRAPHQL_ENDPOINT:-/web/api/v2.1/unifiedalerts/graphql}
+      PURPLEMCP_MISCONFIGURATIONS_GRAPHQL_ENDPOINT: ${PURPLEMCP_MISCONFIGURATIONS_GRAPHQL_ENDPOINT:-/web/api/v2.1/xspm/findings/misconfigurations/graphql}
+      PURPLEMCP_VULNERABILITIES_GRAPHQL_ENDPOINT: ${PURPLEMCP_VULNERABILITIES_GRAPHQL_ENDPOINT:-/web/api/v2.1/xspm/findings/vulnerabilities/graphql}
+      PURPLEMCP_INVENTORY_RESTAPI_ENDPOINT: ${PURPLEMCP_INVENTORY_RESTAPI_ENDPOINT:-/web/api/v2.1/xdr/assets}
+      # Optional: Observability
+      PURPLEMCP_ENV: ${PURPLEMCP_ENV:-production}
+      PURPLEMCP_LOGFIRE_TOKEN: ${PURPLEMCP_LOGFIRE_TOKEN:-}
+    stdin_open: true
+    tty: true
+    profiles:
+      - stdio
+
+  purple-mcp-proxy:
+    image: nginx:1.27-alpine
+    container_name: purple-mcp-proxy
+    environment:
+      PURPLEMCP_AUTH_TOKEN: ${PURPLEMCP_AUTH_TOKEN:-your-secure-token-here}
+      NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx
+    volumes:
+      - ./deploy/nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - purple-mcp-streamable-http
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost/internal/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    profiles:
+      - proxy
+      - production
+
+networks:
+  default:
+    name: purple-mcp-network
+    driver: bridge
