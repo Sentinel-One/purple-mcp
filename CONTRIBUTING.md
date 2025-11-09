@@ -127,7 +127,7 @@ EOF
 docker compose --profile all up
 ```
 
-Note: Production-ready images are published to `ghcr.io/sentinel-one/purple-mcp` on every push to `main` and on release tags. See [DOCKER.md](DOCKER.md) for deployment options and [PRODUCTION_SETUP.md](PRODUCTION_SETUP.md) for production with authentication.
+Note: Production-ready images are published to `ghcr.io/sentinel-one/purple-mcp` on on release tags. See [DOCKER.md](DOCKER.md) for deployment options and [PRODUCTION_SETUP.md](PRODUCTION_SETUP.md) for production with authentication.
 
 ## Architecture: Tools vs Libraries
 
