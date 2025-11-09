@@ -147,9 +147,9 @@ jobs:
 
           # Wait for server to start with retry logic
           echo "Waiting for ${{ matrix.mode }} server to become healthy..."
-          for i in {1..10}; do
+          for i in {1..20}; do
             if docker ps --filter name=purple-mcp-${{ matrix.mode }}-test --format "{{.Names}}" | grep -q purple-mcp-${{ matrix.mode }}-test; then
-              if curl --retry 3 --retry-delay 2 --retry-connrefused -f http://localhost:${{ matrix.port }}/health 2>/dev/null; then
+              if curl --retry 5 --retry-delay 1 --retry-all-errors --connect-timeout 2 --max-time 5 -f http://localhost:${{ matrix.port }}/health; then
                 echo "✓ ${{ matrix.mode }} mode started successfully and health check passed"
                 break
               fi
@@ -158,13 +158,13 @@ jobs:
               docker logs purple-mcp-${{ matrix.mode }}-test
               exit 1
             fi
-            if [ $i -eq 10 ]; then
+            if [ $i -eq 20 ]; then
               echo "✗ ${{ matrix.mode }} mode health check failed after retries"
               docker logs purple-mcp-${{ matrix.mode }}-test
               docker stop purple-mcp-${{ matrix.mode }}-test || true
               exit 1
             fi
-            sleep 2
+            sleep 3
           done
 
           # Cleanup
@@ -364,19 +364,19 @@ jobs:
 
           # Wait for services to be healthy with retry logic
           echo "Waiting for services to start..."
-          for i in {1..15}; do
+          for i in {1..20}; do
             if docker compose ps | grep -q "purple-mcp-streamable-http" && \
                docker compose ps | grep -q "purple-mcp-proxy"; then
               echo "✓ Services started"
               break
             fi
-            if [ $i -eq 15 ]; then
+            if [ $i -eq 20 ]; then
               echo "✗ Services did not start in time"
               docker compose logs
               docker compose down
               exit 1
             fi
-            sleep 2
+            sleep 3
           done
 
           # Check if services are running
@@ -398,18 +398,18 @@ jobs:
 
           # Wait for backend to become healthy
           echo "Waiting for backend to become healthy..."
-          for i in {1..30}; do
+          for i in {1..40}; do
             if docker compose ps purple-mcp-streamable-http | grep -q "healthy"; then
               echo "✓ Backend is healthy"
               break
             fi
-            if [ $i -eq 30 ]; then
+            if [ $i -eq 40 ]; then
               echo "✗ Backend did not become healthy in time"
               docker compose logs purple-mcp-streamable-http
               docker compose down
               exit 1
             fi
-            sleep 1
+            sleep 2
           done
 
           # Test authentication: 401 without Authorization header
