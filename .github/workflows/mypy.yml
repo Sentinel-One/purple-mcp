@@ -16,10 +16,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v5
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
+      - name: Setup Python and uv
+        uses: ./.github/actions/setup-python-uv
 
       - name: Run mypy check
         run: |
