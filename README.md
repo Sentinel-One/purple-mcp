@@ -44,17 +44,19 @@ uvx --from git+https://github.com/Sentinel-One/purple-mcp.git purple-mcp --mode=
 ### Using Docker
 
 ```bash
+# Build the image
+docker build -t purple-mcp:latest .
+
+# Run with your credentials
 export PURPLEMCP_CONSOLE_TOKEN="your_token"
 export PURPLEMCP_CONSOLE_BASE_URL="https://your-console.sentinelone.net"
 
 docker run -p 8000:8000 \
   -e PURPLEMCP_CONSOLE_TOKEN \
   -e PURPLEMCP_CONSOLE_BASE_URL \
-  ghcr.io/sentinel-one/purple-mcp:latest \
+  purple-mcp:latest \
   --mode streamable-http
 ```
-
-Images are published to [`ghcr.io/sentinel-one/purple-mcp`](https://github.com/Sentinel-One/purple-mcp/pkgs/container/purple-mcp) on release tags.
 
 For production deployments, see [Deployment Guide](DOCKER.md).
 

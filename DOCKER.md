@@ -21,21 +21,9 @@ docker compose version
 
 **Note:** Docker Compose V1 (`docker-compose` with a hyphen) is deprecated and not supported. Use `docker compose` (space, not hyphen) for V2.
 
-## Getting the Image
+## Building the Image
 
-Pre-built images are published to `ghcr.io/sentinel-one/purple-mcp`:
-
-```bash
-# Pull the latest image
-docker pull ghcr.io/sentinel-one/purple-mcp:latest
-
-# Or a specific version
-docker pull ghcr.io/sentinel-one/purple-mcp:v0.5.1
-```
-
-Images are automatically published on release tags (e.g., `v0.5.1`).
-
-## Building Locally
+Build the Docker image locally:
 
 ```bash
 # Build locally
@@ -44,6 +32,20 @@ docker build -t purple-mcp:latest .
 # Build with BuildKit (faster caching)
 DOCKER_BUILDKIT=1 docker build -t purple-mcp:latest .
 ```
+
+### Pushing to Your Registry
+
+After building, you can tag and push the image to your container registry:
+
+```bash
+# Tag for your registry
+docker tag purple-mcp:latest your-registry.example.com/purple-mcp:latest
+
+# Push to your registry
+docker push your-registry.example.com/purple-mcp:latest
+```
+
+Replace `your-registry.example.com` with your actual registry URL (e.g., Docker Hub, AWS ECR, Google Container Registry, Azure Container Registry, or a private registry).
 
 ## Running with Docker
 
@@ -247,7 +249,7 @@ spec:
     spec:
       containers:
       - name: purple-mcp
-        image: ghcr.io/sentinel-one/purple-mcp:latest
+        image: your-registry.example.com/purple-mcp:latest
         ports:
         - containerPort: 8000
         env:
