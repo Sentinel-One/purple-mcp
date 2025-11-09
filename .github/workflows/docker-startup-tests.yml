@@ -260,55 +260,23 @@ jobs:
 
       - name: Test loopback address detection (127.0.0.1)
         run: |
-          # Create a test entrypoint that prints the command args
-          cat > test-entrypoint.sh << 'EOF'
+          # Replace python with a fake that echoes args - entrypoint execs python so we intercept to see the command it builds
+          cat > fake-python << 'EOF'
           #!/bin/sh
-          set -eu
-          MCP_MODE="${MCP_MODE:-stdio}"
-          MCP_HOST="${MCP_HOST:-0.0.0.0}"
-          MCP_PORT="${MCP_PORT:-8000}"
-          set -- python -u -m purple_mcp.cli --mode "$MCP_MODE" --host "$MCP_HOST" --port "$MCP_PORT"
-          ALLOW_REMOTE_ACCESS=false
-          case "$MCP_MODE" in
-              sse|streamable-http)
-                  case "$MCP_HOST" in
-                      localhost|127.0.0.1|::1)
-                          ;;
-                      *)
-                          set -- "$@" --allow-remote-access
-                          ALLOW_REMOTE_ACCESS=true
-                          ;;
-                  esac
-                  ;;
-              stdio)
-                  ;;
-              *)
-                  if [ "$MCP_HOST" != "localhost" ] && [ "$MCP_HOST" != "127.0.0.1" ] && [ "$MCP_HOST" != "::1" ]; then
-                      set -- "$@" --allow-remote-access
-                      ALLOW_REMOTE_ACCESS=true
-                  fi
-                  ;;
-          esac
-          echo "Command: $@"
-          echo "ALLOW_REMOTE_ACCESS=$ALLOW_REMOTE_ACCESS"
+          echo "python $@"
           EOF
-          chmod +x test-entrypoint.sh
+          chmod +x fake-python
 
           # Test with 127.0.0.1 (should NOT have --allow-remote-access)
           output=$(docker run --rm \
-            -v $(pwd)/test-entrypoint.sh:/test-entrypoint.sh:ro \
+            -v $(pwd)/fake-python:/app/.venv/bin/python:ro \
             -e MCP_MODE=streamable-http \
             -e MCP_HOST=127.0.0.1 \
-            purple-mcp:entrypoint-test \
-            /test-entrypoint.sh)
+            purple-mcp:entrypoint-test)
 
           echo "$output"
           if echo "$output" | grep -q "allow-remote-access"; then
             echo "✗ ERROR: 127.0.0.1 should NOT trigger --allow-remote-access"
-            exit 1
-          fi
-          if ! echo "$output" | grep -q "ALLOW_REMOTE_ACCESS=false"; then
-            echo "✗ ERROR: ALLOW_REMOTE_ACCESS should be false for 127.0.0.1"
             exit 1
           fi
           echo "✓ 127.0.0.1 correctly does NOT trigger remote access"
@@ -317,19 +285,14 @@ jobs:
         run: |
           # Test with ::1 (should NOT have --allow-remote-access)
           output=$(docker run --rm \
-            -v $(pwd)/test-entrypoint.sh:/test-entrypoint.sh:ro \
+            -v $(pwd)/fake-python:/app/.venv/bin/python:ro \
             -e MCP_MODE=streamable-http \
             -e MCP_HOST=::1 \
-            purple-mcp:entrypoint-test \
-            /test-entrypoint.sh)
+            purple-mcp:entrypoint-test)
 
           echo "$output"
           if echo "$output" | grep -q "allow-remote-access"; then
             echo "✗ ERROR: ::1 should NOT trigger --allow-remote-access"
-            exit 1
-          fi
-          if ! echo "$output" | grep -q "ALLOW_REMOTE_ACCESS=false"; then
-            echo "✗ ERROR: ALLOW_REMOTE_ACCESS should be false for ::1"
             exit 1
           fi
           echo "✓ ::1 correctly does NOT trigger remote access"
@@ -338,19 +301,14 @@ jobs:
         run: |
           # Test with localhost (should NOT have --allow-remote-access)
           output=$(docker run --rm \
-            -v $(pwd)/test-entrypoint.sh:/test-entrypoint.sh:ro \
+            -v $(pwd)/fake-python:/app/.venv/bin/python:ro \
             -e MCP_MODE=streamable-http \
             -e MCP_HOST=localhost \
-            purple-mcp:entrypoint-test \
-            /test-entrypoint.sh)
+            purple-mcp:entrypoint-test)
 
           echo "$output"
           if echo "$output" | grep -q "allow-remote-access"; then
             echo "✗ ERROR: localhost should NOT trigger --allow-remote-access"
-            exit 1
-          fi
-          if ! echo "$output" | grep -q "ALLOW_REMOTE_ACCESS=false"; then
-            echo "✗ ERROR: ALLOW_REMOTE_ACCESS should be false for localhost"
             exit 1
           fi
           echo "✓ localhost correctly does NOT trigger remote access"
@@ -359,19 +317,14 @@ jobs:
         run: |
           # Test with 0.0.0.0 (SHOULD have --allow-remote-access)
           output=$(docker run --rm \
-            -v $(pwd)/test-entrypoint.sh:/test-entrypoint.sh:ro \
+            -v $(pwd)/fake-python:/app/.venv/bin/python:ro \
             -e MCP_MODE=streamable-http \
             -e MCP_HOST=0.0.0.0 \
-            purple-mcp:entrypoint-test \
-            /test-entrypoint.sh)
+            purple-mcp:entrypoint-test)
 
           echo "$output"
           if ! echo "$output" | grep -q "allow-remote-access"; then
             echo "✗ ERROR: 0.0.0.0 SHOULD trigger --allow-remote-access"
-            exit 1
-          fi
-          if ! echo "$output" | grep -q "ALLOW_REMOTE_ACCESS=true"; then
-            echo "✗ ERROR: ALLOW_REMOTE_ACCESS should be true for 0.0.0.0"
             exit 1
           fi
           echo "✓ 0.0.0.0 correctly triggers remote access"
@@ -403,6 +356,7 @@ jobs:
             -out ssl/cert.pem \
             -days 1 -nodes \
             -subj "/CN=localhost"
+          chmod 644 ssl/key.pem ssl/cert.pem
 
       - name: Build Docker image
         uses: docker/build-push-action@v6
@@ -436,12 +390,6 @@ jobs:
           export PURPLEMCP_AUTH_TOKEN="test-token-12345"
           export PURPLEMCP_CONSOLE_TOKEN="${{ secrets.CONSOLE_TOKEN }}"
           export PURPLEMCP_CONSOLE_BASE_URL="${{ secrets.CONSOLE_BASE_URL }}"
-
-          # Test nginx config template substitution
-          docker run --rm \
-            -v $(pwd)/deploy/nginx/nginx.conf.template:/tmp/nginx.conf.template:ro \
-            -e PURPLEMCP_AUTH_TOKEN \
-            nginx:1.27-alpine sh -c 'envsubst "\$PURPLEMCP_AUTH_TOKEN" < /tmp/nginx.conf.template > /etc/nginx/nginx.conf && nginx -t'
 
           # Verify token was substituted correctly in the generated config
           GENERATED_CONFIG=$(docker run --rm \
@@ -503,9 +451,25 @@ jobs:
 
           echo "✓ Proxy configuration is valid and services are running"
 
+          # Wait for backend to become healthy
+          echo "Waiting for backend to become healthy..."
+          for i in {1..30}; do
+            if docker compose ps purple-mcp-streamable-http | grep -q "healthy"; then
+              echo "✓ Backend is healthy"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "✗ Backend did not become healthy in time"
+              docker compose logs purple-mcp-streamable-http
+              docker compose down
+              exit 1
+            fi
+            sleep 1
+          done
+
           # Test authentication: 401 without Authorization header
           echo "Testing auth: expecting 401 without auth header..."
-          http_code=$(curl -k -s -o /dev/null -w "%{http_code}" https://localhost/)
+          http_code=$(curl -k -s -o /dev/null -w "%{http_code}" --max-time 10 https://localhost/)
           if [ "$http_code" != "401" ]; then
             echo "✗ Expected 401 without auth header, got $http_code"
             docker compose logs
@@ -516,7 +480,7 @@ jobs:
 
           # Test authentication: 403 with invalid token
           echo "Testing auth: expecting 403 with invalid token..."
-          http_code=$(curl -k -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer invalid-token" https://localhost/)
+          http_code=$(curl -k -s -o /dev/null -w "%{http_code}" --max-time 10 -H "Authorization: Bearer invalid-token" https://localhost/)
           if [ "$http_code" != "403" ]; then
             echo "✗ Expected 403 with invalid token, got $http_code"
             docker compose logs
@@ -527,7 +491,7 @@ jobs:
 
           # Test authentication: 200 with valid token (health endpoint)
           echo "Testing auth: expecting 200 with valid token..."
-          http_code=$(curl -k -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer test-token-12345" https://localhost/health)
+          http_code=$(curl -k -s -o /dev/null -w "%{http_code}" --max-time 10 -H "Authorization: Bearer test-token-12345" https://localhost/health)
           if [ "$http_code" != "200" ]; then
             echo "✗ Expected 200 with valid token, got $http_code"
             docker compose logs

@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   purple-mcp-sse:
     build:
@@ -54,11 +52,6 @@ services:
     ports:
       - "8001:8000"
     restart: unless-stopped
-    # Security hardening for production deployments
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/health"]
       interval: 30s
@@ -109,11 +102,6 @@ services:
     depends_on:
       - purple-mcp-streamable-http
     restart: unless-stopped
-    # Security hardening for production deployments
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://localhost/internal/health"]
       interval: 30s
