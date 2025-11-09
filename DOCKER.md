@@ -56,14 +56,26 @@ export PURPLEMCP_CONSOLE_TOKEN="your_token"
 export PURPLEMCP_CONSOLE_BASE_URL="https://your-console.sentinelone.net"
 ```
 
+**Note:** Docker deployments use environment variables for mode/host/port configuration. CLI arguments (`--mode`, `--host`, `--port`) don't work in Docker containers and are silently ignored.
+
+Configure the server using these variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_MODE` | `stdio` | Transport mode: `stdio`, `sse`, or `streamable-http` |
+| `MCP_HOST` | `0.0.0.0` | Host to bind to (for SSE/HTTP modes) |
+| `MCP_PORT` | `8000` | Port to bind to (for SSE/HTTP modes) |
+
+CLI arguments work when running outside Docker (via `uvx` or `uv run`).
+
 ### Streamable-HTTP (Recommended)
 
 ```bash
 docker run -p 8000:8000 \
   -e PURPLEMCP_CONSOLE_TOKEN \
   -e PURPLEMCP_CONSOLE_BASE_URL \
-  purple-mcp:latest \
-  --mode streamable-http
+  -e MCP_MODE=streamable-http \
+  purple-mcp:latest
 ```
 
 ### SSE Mode
@@ -72,8 +84,8 @@ docker run -p 8000:8000 \
 docker run -p 8000:8000 \
   -e PURPLEMCP_CONSOLE_TOKEN \
   -e PURPLEMCP_CONSOLE_BASE_URL \
-  purple-mcp:latest \
-  --mode sse
+  -e MCP_MODE=sse \
+  purple-mcp:latest
 ```
 
 ### STDIO Mode (Local)
@@ -82,8 +94,8 @@ docker run -p 8000:8000 \
 docker run -it \
   -e PURPLEMCP_CONSOLE_TOKEN \
   -e PURPLEMCP_CONSOLE_BASE_URL \
-  purple-mcp:latest \
-  --mode stdio
+  -e MCP_MODE=stdio \
+  purple-mcp:latest
 ```
 
 ## Docker Compose
@@ -123,6 +135,11 @@ docker compose --profile production up
 **Required:**
 - `PURPLEMCP_CONSOLE_TOKEN` - SentinelOne service user token
 - `PURPLEMCP_CONSOLE_BASE_URL` - Console URL (e.g., `https://console.sentinelone.net`)
+
+**Server configuration (Docker only):**
+- `MCP_MODE` - Transport mode: `stdio`, `sse`, or `streamable-http` (default: `stdio`)
+- `MCP_HOST` - Host to bind to for SSE/HTTP modes (default: `0.0.0.0`)
+- `MCP_PORT` - Port to bind to for SSE/HTTP modes (default: `8000`)
 
 **Optional:**
 - `PURPLEMCP_CONSOLE_GRAPHQL_ENDPOINT` - Default: `/web/api/v2.1/graphql`
@@ -211,8 +228,8 @@ docker logs <container_name>
 docker run -it \
   -e PURPLEMCP_CONSOLE_TOKEN \
   -e PURPLEMCP_CONSOLE_BASE_URL \
-  purple-mcp:latest \
-  --mode streamable-http --verbose
+  -e MCP_MODE=streamable-http \
+  purple-mcp:latest
 ```
 
 ### Authentication errors from SentinelOne
@@ -225,7 +242,11 @@ Check your token:
 ### Port already in use
 
 ```bash
-docker run -p 8001:8000 purple-mcp:latest --mode streamable-http
+docker run -p 8001:8000 \
+  -e PURPLEMCP_CONSOLE_TOKEN \
+  -e PURPLEMCP_CONSOLE_BASE_URL \
+  -e MCP_MODE=streamable-http \
+  purple-mcp:latest
 ```
 
 ## Kubernetes Deployment

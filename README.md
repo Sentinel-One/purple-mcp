@@ -54,8 +54,8 @@ export PURPLEMCP_CONSOLE_BASE_URL="https://your-console.sentinelone.net"
 docker run -p 8000:8000 \
   -e PURPLEMCP_CONSOLE_TOKEN \
   -e PURPLEMCP_CONSOLE_BASE_URL \
-  purple-mcp:latest \
-  --mode streamable-http
+  -e MCP_MODE=streamable-http \
+  purple-mcp:latest
 ```
 
 For production deployments, see [Deployment Guide](DOCKER.md).
