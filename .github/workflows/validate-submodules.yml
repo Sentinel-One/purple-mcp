@@ -19,14 +19,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Setup Python and uv
-        uses: ./.github/actions/setup-python-uv
+      - uses: actions/checkout@v5
         with:
-          checkout-submodules: 'true'
+          submodules: true
 
       - name: Fetch tags in submodules
         run: |
           git submodule foreach 'git fetch --tags'
+
+      - name: Setup Python and uv
+        uses: ./.github/actions/setup-python-uv
 
       - name: Validate submodule versions
         run: |

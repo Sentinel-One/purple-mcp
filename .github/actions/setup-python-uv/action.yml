@@ -1,22 +1,13 @@
 name: Setup Python with uv
-description: Checkout code, install uv, and cache dependencies
+description: Install uv and cache dependencies
 inputs:
   python-version:
     description: Python version to use (optional, for matrix builds)
     required: false
     default: ''
-  checkout-submodules:
-    description: Set to true to checkout git submodules
-    required: false
-    default: 'false'
 runs:
   using: composite
   steps:
-    - name: Checkout code
-      uses: actions/checkout@v5
-      with:
-        submodules: ${{ inputs.checkout-submodules == 'true' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[submodules]')) }}
-
     - name: Install uv
       uses: astral-sh/setup-uv@v7
 

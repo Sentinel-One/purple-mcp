@@ -25,6 +25,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - uses: actions/checkout@v5
+
       - name: Setup Python and uv
         uses: ./.github/actions/setup-python-uv
         with:
