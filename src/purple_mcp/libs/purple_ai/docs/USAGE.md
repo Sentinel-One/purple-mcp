@@ -24,6 +24,7 @@ async def main():
         user_details=PurpleAIUserDetails(
             account_id=os.getenv("PURPLEMCP_PURPLE_AI_ACCOUNT_ID"),
             team_token=os.getenv("PURPLEMCP_PURPLE_AI_TEAM_TOKEN"),
+            session_id=os.getenv("PURPLEMCP_PURPLE_AI_SESSION_ID"),
             email_address=os.getenv("PURPLEMCP_PURPLE_AI_EMAIL_ADDRESS"),
             user_agent="PurpleAI-Client/1.0",
             build_date="2024-01-01",
@@ -62,6 +63,7 @@ config = PurpleAIConfig(
     user_details=PurpleAIUserDetails(
         account_id="your-account-id",
         team_token="your-team-token",
+        session_id="your-session-id",
         email_address="user@example.com",
         user_agent="PurpleAI-Client/1.0",
         build_date="2024-01-01",

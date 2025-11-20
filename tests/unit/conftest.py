@@ -6,6 +6,7 @@ particularly for environment variable management and logging setup.
 
 import logging
 import os
+import uuid
 from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager
 from pathlib import Path
@@ -222,6 +223,7 @@ def mock_settings() -> Callable[..., MagicMock]:
             "purple_ai_account_id": "test-account",
             "purple_ai_team_token": "test-team-token",
             "purple_ai_email_address": "test@example.test",
+            "purple_ai_session_id": uuid.uuid4().hex,
             "purple_ai_user_agent": "test-agent",
             "purple_ai_build_date": "2025-01-01",
             "purple_ai_build_hash": "testhash",

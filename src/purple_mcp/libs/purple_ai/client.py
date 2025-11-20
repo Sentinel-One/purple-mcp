@@ -12,6 +12,7 @@ import os
 import secrets
 import string
 import time
+import uuid
 from datetime import timedelta
 from enum import Enum
 from http import HTTPStatus
@@ -26,6 +27,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from purple_mcp import __version__
 from purple_mcp.libs.purple_ai.config import (
     PurpleAIConfig,
     PurpleAIConsoleDetails,
@@ -67,12 +69,13 @@ def _build_graphql_request(
     end_time: int,
     base_url: str,
     version: str,
-    account_id: str,
-    team_token: str,
-    email_address: str,
-    user_agent: str,
-    build_date: str,
-    build_hash: str,
+    scalyr_account_id: str,
+    scalyr_team_token: str,
+    session_id: str | None,
+    email_address: str | None,
+    user_agent: str | None,
+    build_date: str | None,
+    build_hash: str | None,
     conversation_id: str,
 ) -> str:
     """Construct a GraphQL request with properly escaped string values.
@@ -87,8 +90,9 @@ def _build_graphql_request(
         end_time: End time in milliseconds since epoch
         base_url: Console base URL
         version: Console version
-        account_id: User account ID
-        team_token: User team token
+        scalyr_account_id: Scalyr User account ID
+        scalyr_team_token: Scalyr User team token
+        session_id: User session ID
         email_address: User email address
         user_agent: User agent string
         build_date: Build date string
@@ -121,8 +125,9 @@ def _build_graphql_request(
                     viewSelector: EDR
                     contentType: NATURAL_LANGUAGE
                     userDetails: {{
-                        accountId: {json.dumps(account_id)}
-                        teamToken: {json.dumps(team_token)}
+                        accountId: {json.dumps(scalyr_account_id)}
+                        teamToken: {json.dumps(scalyr_team_token)}
+                        sessionId: {json.dumps(session_id)}
                         emailAddress: {json.dumps(email_address)}
                         userAgent: {json.dumps(user_agent)}
                         buildDate: {json.dumps(build_date)}
@@ -213,8 +218,9 @@ class PurpleAIClient:
             end_time=current_time_millis,
             base_url=self.config.console_details.base_url,
             version=self.config.console_details.version,
-            account_id=self.config.user_details.account_id,
-            team_token=self.config.user_details.team_token,
+            scalyr_account_id=self.config.user_details.account_id,
+            scalyr_team_token=self.config.user_details.team_token,
+            session_id=self.config.user_details.session_id,
             email_address=self.config.user_details.email_address,
             user_agent=self.config.user_details.user_agent,
             build_date=self.config.user_details.build_date,
@@ -519,16 +525,17 @@ if __name__ == "__main__":
         """Run a test query against Purple AI."""
         config = PurpleAIConfig(
             user_details=PurpleAIUserDetails(
-                account_id="AIMONITORING",
-                team_token="AIMONITORING",
-                email_address="ai+purple-mcp@sentinelone.com",
-                user_agent="IsaacAsimovMonitoringInc",
-                build_date="02/28/2025, 00:00:00 AM",
-                build_hash="N/A",
+                account_id="0",
+                team_token="0",
+                session_id=uuid.uuid4().hex,
+                email_address=None,
+                user_agent=f"sentinelone/purple-mcp (version {__version__})",
+                build_date=None,
+                build_hash=None,
             ),
             console_details=PurpleAIConsoleDetails(
                 base_url="https://console.example.com",
-                version="S-25.1.1#30",
+                version="S",
             ),
         )
         result = await ask_purple(config, "What's the weather in Tokyo?")
