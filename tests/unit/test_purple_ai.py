@@ -2,6 +2,7 @@
 
 import re
 import string
+import uuid
 from unittest.mock import patch
 
 import httpx
@@ -29,6 +30,7 @@ def purple_ai_config() -> PurpleAIConfig:
         user_details=PurpleAIUserDetails(
             account_id="TEST_ACCOUNT",
             team_token="TEST_TEAM",
+            session_id=uuid.uuid4().hex,
             email_address="test@example.test",
             user_agent="TestClient/1.0",
             build_date="2025-01-01",
@@ -514,6 +516,7 @@ def test_purple_ai_config_graphql_url_requires_https() -> None:
             user_details=PurpleAIUserDetails(
                 account_id="TEST_ACCOUNT",
                 team_token="TEST_TEAM",
+                session_id=uuid.uuid4().hex,
                 email_address="test@example.test",
                 user_agent="TestClient/1.0",
                 build_date="2025-01-01",
@@ -534,6 +537,7 @@ def test_purple_ai_config_graphql_url_strips_whitespace() -> None:
         user_details=PurpleAIUserDetails(
             account_id="TEST_ACCOUNT",
             team_token="TEST_TEAM",
+            session_id=uuid.uuid4().hex,
             email_address="test@example.test",
             user_agent="TestClient/1.0",
             build_date="2025-01-01",
@@ -555,6 +559,7 @@ def test_purple_ai_config_graphql_url_strips_leading_whitespace() -> None:
         user_details=PurpleAIUserDetails(
             account_id="TEST_ACCOUNT",
             team_token="TEST_TEAM",
+            session_id=uuid.uuid4().hex,
             email_address="test@example.test",
             user_agent="TestClient/1.0",
             build_date="2025-01-01",
@@ -576,6 +581,7 @@ def test_purple_ai_config_auth_token_cannot_be_empty() -> None:
             user_details=PurpleAIUserDetails(
                 account_id="TEST_ACCOUNT",
                 team_token="TEST_TEAM",
+                session_id=uuid.uuid4().hex,
                 email_address="test@example.test",
                 user_agent="TestClient/1.0",
                 build_date="2025-01-01",
@@ -595,6 +601,7 @@ def test_purple_ai_config_auth_token_strips_whitespace() -> None:
         user_details=PurpleAIUserDetails(
             account_id="TEST_ACCOUNT",
             team_token="TEST_TEAM",
+            session_id=uuid.uuid4().hex,
             email_address="test@example.test",
             user_agent="TestClient/1.0",
             build_date="2025-01-01",
@@ -617,6 +624,7 @@ def test_purple_ai_config_timeout_must_be_positive() -> None:
             user_details=PurpleAIUserDetails(
                 account_id="TEST_ACCOUNT",
                 team_token="TEST_TEAM",
+                session_id=uuid.uuid4().hex,
                 email_address="test@example.test",
                 user_agent="TestClient/1.0",
                 build_date="2025-01-01",
@@ -638,6 +646,7 @@ def test_purple_ai_config_timeout_cannot_be_negative() -> None:
             user_details=PurpleAIUserDetails(
                 account_id="TEST_ACCOUNT",
                 team_token="TEST_TEAM",
+                session_id=uuid.uuid4().hex,
                 email_address="test@example.test",
                 user_agent="TestClient/1.0",
                 build_date="2025-01-01",
@@ -658,6 +667,7 @@ def test_purple_ai_config_accepts_valid_timeout() -> None:
         user_details=PurpleAIUserDetails(
             account_id="TEST_ACCOUNT",
             team_token="TEST_TEAM",
+            session_id=uuid.uuid4().hex,
             email_address="test@example.test",
             user_agent="TestClient/1.0",
             build_date="2025-01-01",

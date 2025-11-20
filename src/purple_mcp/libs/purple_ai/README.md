@@ -31,6 +31,7 @@ async def main():
         user_details=PurpleAIUserDetails(
             account_id="your-account-id",
             team_token="your-team-token",
+            session_id="your-session-id",
             email_address="user@example.com",
             user_agent="PurpleAI-Client/1.0",
             build_date="2024-01-01",

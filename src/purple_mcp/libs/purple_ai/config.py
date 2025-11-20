@@ -25,10 +25,11 @@ class PurpleAIUserDetails(_ProgrammaticSettings):
 
     account_id: str = Field(..., description="Account ID for the user.")
     team_token: str = Field(..., description="Team token for the user.")
-    email_address: str = Field(..., description="Email address of the user.")
-    user_agent: str = Field(..., description="User agent for the request.")
-    build_date: str = Field(..., description="Build date of the client.")
-    build_hash: str = Field(..., description="Build hash of the client.")
+    session_id: str | None = Field(..., description="Session ID for the user.")
+    email_address: str | None = Field(..., description="Email address of the user.")
+    user_agent: str | None = Field(..., description="User agent for the request.")
+    build_date: str | None = Field(..., description="Build date of the client.")
+    build_hash: str | None = Field(..., description="Build hash of the client.")
 
 
 class PurpleAIConsoleDetails(_ProgrammaticSettings):

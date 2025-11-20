@@ -93,7 +93,7 @@ config = PurpleAIConfig(
     auth_token="your-token",
     console_details=PurpleAIConsoleDetails(
         base_url="https://console.example.com",
-        version="S-25.1.1#30"
+        version="S"
     )
 )
 ```
@@ -115,7 +115,8 @@ The base URL of your SentinelOne console.
 ##### `version` (required)
 Version of your SentinelOne console.
 
-**Format:** `S-{version}#{build}` (e.g., `S-25.1.1#30`)
+**Format 1:** `{id}` (e.g., `S`)
+**Format 2:** `{id}-{version}#{build}` (e.g., `S-25.1.1#30`)
 
 **Where to find:**
 1. SentinelOne console → Help → About
@@ -127,7 +128,8 @@ Team-specific token for multi-tenant environments.
 ##### `console_version` (optional)
 Version of your SentinelOne console.
 
-**Format:** `S-{version}#{build}` (e.g., `S-25.1.1#30`)
+**Format 1:** `{id}` (e.g., `S`)
+**Format 2:** `{id}-{version}#{build}` (e.g., `S-25.1.1#30`)
 
 **Where to find:**
 1. SentinelOne console → Help → About
@@ -207,6 +209,7 @@ def create_config_from_env():
         console_details = PurpleAIConsoleDetails(
             account_id=os.getenv("PURPLEMCP_PURPLE_AI_ACCOUNT_ID"),
             team_token=os.getenv("PURPLEMCP_PURPLE_AI_TEAM_TOKEN"),
+            session_id=os.getenv("PURPLEMCP_PURPLE_AI_SESSION_ID"),
             console_version=os.getenv("PURPLEMCP_PURPLE_AI_CONSOLE_VERSION"),
             build_date=os.getenv("PURPLEMCP_PURPLE_AI_BUILD_DATE"),
             build_hash=os.getenv("PURPLEMCP_PURPLE_AI_BUILD_HASH")
@@ -247,7 +250,8 @@ PURPLEMCP_CONSOLE_TOKEN=your-service-token
 # Console details
 PURPLEMCP_PURPLE_AI_ACCOUNT_ID=123456789
 PURPLEMCP_PURPLE_AI_TEAM_TOKEN=team-specific-token
-PURPLEMCP_PURPLE_AI_CONSOLE_VERSION=S-25.1.1#30
+PURPLEMCP_PURPLE_AI_SESSION_ID=session-specific-token
+PURPLEMCP_PURPLE_AI_CONSOLE_VERSION=S
 PURPLEMCP_PURPLE_AI_BUILD_DATE="01/15/2025, 10:30:00 AM"
 PURPLEMCP_PURPLE_AI_BUILD_HASH=abc123def456
 
@@ -269,7 +273,7 @@ def create_dev_config():
         auth_token=os.getenv("DEV_PURPLEMCP_CONSOLE_TOKEN"),
         console_details=PurpleAIConsoleDetails(
             account_id=os.getenv("DEV_PURPLEMCP_PURPLE_AI_ACCOUNT_ID"),
-            console_version="S-25.1.1#30"
+            console_version="S"
         ),
         user_details=PurpleAIUserDetails(
             email_address="dev@company.com",
@@ -310,7 +314,7 @@ def create_test_config():
         auth_token="test-token",
         console_details=PurpleAIConsoleDetails(
             account_id="test-account-123",
-            console_version="S-25.1.1#30"
+            console_version="S"
         ),
         user_details=PurpleAIUserDetails(
             email_address="test@company.com",
@@ -337,6 +341,7 @@ try:
         user_details=PurpleAIUserDetails(
             account_id="test",
             team_token="test",
+            session_id="test",
             email_address="test@example.test",
             user_agent="test",
             build_date="2025-01-01",
@@ -355,6 +360,7 @@ try:
         user_details=PurpleAIUserDetails(
             account_id="test",
             team_token="test",
+            session_id="test",            
             email_address="test@example.test",
             user_agent="test",
             build_date="2025-01-01",
@@ -379,6 +385,7 @@ try:
         user_details=PurpleAIUserDetails(
             account_id="test",
             team_token="test",
+            session_id="test",            
             email_address="test@example.test",
             user_agent="test",
             build_date="2025-01-01",
@@ -401,6 +408,7 @@ try:
         user_details=PurpleAIUserDetails(
             account_id="test",
             team_token="test",
+            session_id="test",
             email_address="test@example.test",
             user_agent="test",
             build_date="2025-01-01",

@@ -7,12 +7,15 @@ present before the server begins accepting requests.
 """
 
 import logging
+import uuid
 from functools import lru_cache
 from typing import ClassVar, Final
 from urllib.parse import urlparse
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from purple_mcp import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +37,7 @@ VULNERABILITIES_GRAPHQL_ENDPOINT_ENV: Final[str] = f"{ENV_PREFIX}VULNERABILITIES
 INVENTORY_RESTAPI_ENDPOINT_ENV: Final[str] = f"{ENV_PREFIX}INVENTORY_RESTAPI_ENDPOINT"
 PURPLE_AI_ACCOUNT_ID_ENV: Final[str] = f"{ENV_PREFIX}PURPLE_AI_ACCOUNT_ID"
 PURPLE_AI_TEAM_TOKEN_ENV: Final[str] = f"{ENV_PREFIX}PURPLE_AI_TEAM_TOKEN"
+PURPLE_AI_SESSION_ID_ENV: Final[str] = f"{ENV_PREFIX}PURPLE_AI_SESSION_ID"
 PURPLE_AI_EMAIL_ADDRESS_ENV: Final[str] = f"{ENV_PREFIX}PURPLE_AI_EMAIL_ADDRESS"
 PURPLE_AI_USER_AGENT_ENV: Final[str] = f"{ENV_PREFIX}PURPLE_AI_USER_AGENT"
 PURPLE_AI_BUILD_DATE_ENV: Final[str] = f"{ENV_PREFIX}PURPLE_AI_BUILD_DATE"
@@ -110,39 +114,44 @@ class Settings(BaseSettings):
 
     # Purple AI User Details
     purple_ai_account_id: str = Field(
-        default="AIMONITORING",
+        default="0",
         description="Account ID for Purple AI user details",
         validation_alias=PURPLE_AI_ACCOUNT_ID_ENV,
     )
     purple_ai_team_token: str = Field(
-        default="AIMONITORING",
+        default="0",
         description="Team token for Purple AI user details",
         validation_alias=PURPLE_AI_TEAM_TOKEN_ENV,
     )
-    purple_ai_email_address: str = Field(
-        default="ai+purple-mcp@sentinelone.com",
+    purple_ai_session_id: str | None = Field(
+        default_factory=lambda: uuid.uuid4().hex,
+        description="Session ID for Purple AI user details",
+        validation_alias=PURPLE_AI_SESSION_ID_ENV,
+    )
+    purple_ai_email_address: str | None = Field(
+        default=None,
         description="Email address for Purple AI user details",
         validation_alias=PURPLE_AI_EMAIL_ADDRESS_ENV,
     )
     purple_ai_user_agent: str = Field(
-        default="IsaacAsimovMonitoringInc",
+        default=f"sentinelone/purple-mcp (version {__version__})",
         description="User agent for Purple AI user details",
         validation_alias=PURPLE_AI_USER_AGENT_ENV,
     )
-    purple_ai_build_date: str = Field(
-        default="02/28/2025, 00:00:00 AM",
+    purple_ai_build_date: str | None = Field(
+        default=None,
         description="Build date for Purple AI user details",
         validation_alias=PURPLE_AI_BUILD_DATE_ENV,
     )
-    purple_ai_build_hash: str = Field(
-        default="N/A",
+    purple_ai_build_hash: str | None = Field(
+        default=None,
         description="Build hash for Purple AI user details",
         validation_alias=PURPLE_AI_BUILD_HASH_ENV,
     )
 
     # Purple AI Console Details
     purple_ai_console_version: str = Field(
-        default="S-25.1.1#30",
+        default="S",
         description="Version for Purple AI console details",
         validation_alias=PURPLE_AI_CONSOLE_VERSION_ENV,
     )

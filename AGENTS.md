@@ -42,6 +42,7 @@ Libraries implement **standalone, reusable business logic**:
 
 ```python
 # ✅ CORRECT: Library with explicit configuration
+import uuid
 from purple_mcp.libs.purple_ai import (
     PurpleAIConfig,
     PurpleAIUserDetails,
@@ -52,6 +53,7 @@ from purple_mcp.libs.purple_ai import (
 user_details = PurpleAIUserDetails(
     account_id="account-123",
     team_token="team-token",
+    session_id=uuid.uuid4().hex,
     email_address="user@example.com",
     user_agent="purple-mcp/1.0",
     build_date="2024-01-01",
@@ -104,6 +106,7 @@ async def purple_ai(query: str) -> str:
     user_details = PurpleAIUserDetails(
         account_id=settings.purple_ai_account_id,
         team_token=settings.purple_ai_team_token,
+        session_id=settings.purple_ai_session_id,
         email_address=settings.purple_ai_email_address,
         user_agent=settings.purple_ai_user_agent,
         build_date=settings.purple_ai_build_date,

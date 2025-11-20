@@ -9,6 +9,7 @@ These tests exercise the real client code paths with mocked HTTP responses.
 
 import logging
 import os
+import uuid
 
 import httpx
 import pytest
@@ -69,6 +70,7 @@ class TestSanitizedLogging:
             user_details=PurpleAIUserDetails(
                 account_id="test",
                 team_token="test",
+                session_id=uuid.uuid4().hex,
                 email_address="test@test.test",
                 user_agent="test",
                 build_date="test",
@@ -127,6 +129,7 @@ class TestSanitizedLogging:
             user_details=PurpleAIUserDetails(
                 account_id="test",
                 team_token="test",
+                session_id=uuid.uuid4().hex,
                 email_address="test@test.test",
                 user_agent="test",
                 build_date="test",

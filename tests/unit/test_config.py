@@ -5,10 +5,12 @@ import logging
 import os
 import sys
 from collections.abc import Generator
+from uuid import UUID
 
 import pytest
 from pydantic import ValidationError
 
+from purple_mcp import __version__
 from purple_mcp.config import ENV_PREFIX, Settings, get_settings
 
 
@@ -43,13 +45,14 @@ def test_defaults(minimal_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.graphql_service_token == "token"
     assert settings.sentinelone_console_base_url == "https://console.example.test"
     assert settings.sentinelone_console_graphql_endpoint == "/web/api/v2.1/graphql"
-    assert settings.purple_ai_account_id == "AIMONITORING"
-    assert settings.purple_ai_team_token == "AIMONITORING"
-    assert settings.purple_ai_email_address == "ai+purple-mcp@sentinelone.com"
-    assert settings.purple_ai_user_agent == "IsaacAsimovMonitoringInc"
-    assert settings.purple_ai_build_date == "02/28/2025, 00:00:00 AM"
-    assert settings.purple_ai_build_hash == "N/A"
-    assert settings.purple_ai_console_version == "S-25.1.1#30"
+    assert settings.purple_ai_account_id == "0"
+    assert settings.purple_ai_team_token == "0"
+    assert isinstance(UUID(settings.purple_ai_session_id), UUID)
+    assert settings.purple_ai_email_address is None
+    assert settings.purple_ai_user_agent == f"sentinelone/purple-mcp (version {__version__})"
+    assert settings.purple_ai_build_date is None
+    assert settings.purple_ai_build_hash is None
+    assert settings.purple_ai_console_version == "S"
 
 
 @pytest.mark.parametrize(

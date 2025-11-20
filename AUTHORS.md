@@ -3,6 +3,7 @@
 # To see the full list of contributors, see the revision history.
 
 Michael Moore
-Tom Kuson
-Timothy Ng
+Samuel Matos
 Simin Chen
+Timothy Ng
+Tom Kuson

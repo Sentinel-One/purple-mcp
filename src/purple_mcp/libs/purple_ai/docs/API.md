@@ -18,6 +18,7 @@ Ask Purple AI a question asynchronously.
 
 **Example:**
 ```python
+import uuid
 import asyncio
 from purple_mcp.libs.purple_ai import (
     ask_purple,
@@ -34,6 +35,7 @@ async def main():
         user_details=PurpleAIUserDetails(
             account_id="123456789",
             team_token="team-token",
+            session_id=uuid.uuid4().hex,
             email_address="user@example.com",
             user_agent="MyApp/1.0",
             build_date="2025-01-01",
@@ -41,7 +43,7 @@ async def main():
         ),
         console_details=PurpleAIConsoleDetails(
             base_url="https://console.example.com",
-            version="S-25.1.1#30",
+            version="S",
         ),
     )
 
@@ -72,6 +74,7 @@ Ask Purple AI a question synchronously.
 
 **Example:**
 ```python
+import uuid
 from purple_mcp.libs.purple_ai import sync_ask_purple, PurpleAIConfig, PurpleAIUserDetails, PurpleAIConsoleDetails
 
 config = PurpleAIConfig(
@@ -80,6 +83,7 @@ config = PurpleAIConfig(
     user_details=PurpleAIUserDetails(
         account_id="123456789",
         team_token="team-token",
+        session_id=uuid.uuid4().hex,
         email_address="user@example.com",
         user_agent="MyApp/1.0", 
         build_date="2025-01-01",
@@ -87,7 +91,7 @@ config = PurpleAIConfig(
     ),
     console_details=PurpleAIConsoleDetails(
         base_url="https://console.example.com",
-        version="S-25.1.1#30"
+        version="S"
     )
 )
 
@@ -120,6 +124,7 @@ PurpleAIConfig(
 
 #### Example
 ```python
+import uuid
 from purple_mcp.libs.purple_ai import (
     PurpleAIConfig, 
     PurpleAIConsoleDetails, 
@@ -131,11 +136,12 @@ config = PurpleAIConfig(
     auth_token="your-service-token",
     console_details=PurpleAIConsoleDetails(
         base_url="https://console.example.com",
-        version="S-25.1.1#30"
+        version="S"
     ),
     user_details=PurpleAIUserDetails(
         account_id="123456789",
         team_token="team-token-abc",
+        session_id=uuid.uuid4().hex,
         email_address="analyst@company.com",
         user_agent="MyApp/1.0",
         build_date="2025-01-15",
@@ -164,7 +170,7 @@ PurpleAIConsoleDetails(
 ```python
 console_details = PurpleAIConsoleDetails(
     base_url="https://console.example.com",
-    version="S-25.1.1#30"
+    version="S"
 )
 ```
 
@@ -177,6 +183,7 @@ User-specific configuration details.
 PurpleAIUserDetails(
     account_id: str,
     team_token: str,
+    session_id: str,
     email_address: str,
     user_agent: str,
     build_date: str,
@@ -197,6 +204,7 @@ PurpleAIUserDetails(
 user_details = PurpleAIUserDetails(
     account_id="123456789",
     team_token="team-token-abc",
+    session_id=uuid.uuid4().hex,
     email_address="security.analyst@company.com",
     user_agent="SecurityTools/2.1 (Python/3.11)",
     build_date="2025-01-15",
@@ -411,6 +419,7 @@ The library can use environment variables for configuration:
 
 ```python
 import os
+import uuid
 from purple_mcp.libs.purple_ai import PurpleAIConfig
 
 def create_config_from_env():
@@ -422,6 +431,7 @@ def create_config_from_env():
         user_details=PurpleAIUserDetails(
             account_id=os.getenv("PURPLEMCP_PURPLE_AI_ACCOUNT_ID", ""),
             team_token=os.getenv("PURPLEMCP_PURPLE_AI_TEAM_TOKEN", ""),
+            session_id=os.getenv("PURPLEMCP_PURPLE_AI_SESSION_ID", uuid.uuid4().hex),
             email_address=os.getenv("PURPLEMCP_PURPLE_AI_EMAIL_ADDRESS", ""),
             user_agent=os.getenv("PURPLEMCP_PURPLE_AI_USER_AGENT", "PurpleAI/1.0"),
             build_date=os.getenv("PURPLEMCP_PURPLE_AI_BUILD_DATE", ""),
@@ -468,6 +478,7 @@ test_config = PurpleAIConfig(
     user_details=PurpleAIUserDetails(
         account_id="test-account",
         team_token="test-team-token",
+        session_id="test-session-id",
         email_address="test@example.com",
         user_agent="TestClient/1.0",
         build_date="2025-01-01",
@@ -503,6 +514,7 @@ async def test_purple_ai_integration():
         user_details=PurpleAIUserDetails(
             account_id=os.getenv("PURPLEMCP_PURPLE_AI_ACCOUNT_ID"),
             team_token=os.getenv("PURPLEMCP_PURPLE_AI_TEAM_TOKEN"),
+            session_id=os.getenv("PURPLEMCP_PURPLE_AI_SESSION_ID"),
             email_address=os.getenv("PURPLEMCP_PURPLE_AI_EMAIL_ADDRESS"),
             user_agent=os.getenv("PURPLEMCP_PURPLE_AI_USER_AGENT", "IntegrationTest/1.0"),
             build_date=os.getenv("PURPLEMCP_PURPLE_AI_BUILD_DATE"),

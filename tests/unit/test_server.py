@@ -5,6 +5,7 @@ health check endpoint, and HTTP app configuration.
 """
 
 import inspect
+import uuid
 from collections.abc import Callable
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -203,6 +204,7 @@ class TestToolExecution:
             mock_settings = MagicMock()
             mock_settings.purple_ai_account_id = "test_account"
             mock_settings.purple_ai_team_token = "test_token"
+            mock_settings.purple_ai_session_id = uuid.uuid4().hex
             mock_settings.purple_ai_email_address = "test@example.test"
             mock_settings.purple_ai_user_agent = "test_agent"
             mock_settings.purple_ai_build_date = "2025-01-01"
@@ -360,6 +362,7 @@ class TestServerIntegration:
             mock_settings = MagicMock()
             mock_settings.purple_ai_account_id = "test_account"
             mock_settings.purple_ai_team_token = "test_token"
+            mock_settings.purple_ai_session_id = uuid.uuid4().hex
             mock_settings.purple_ai_email_address = "test@example.test"
             mock_settings.purple_ai_user_agent = "test_agent"
             mock_settings.purple_ai_build_date = "2025-01-01"
