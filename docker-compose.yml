@@ -37,6 +37,7 @@ services:
       MCP_MODE: streamable-http
       MCP_HOST: 0.0.0.0
       MCP_PORT: 8000
+      PURPLEMCP_STATELESS_HTTP: ${PURPLEMCP_STATELESS_HTTP}
       # Required: SentinelOne Console configuration
       PURPLEMCP_CONSOLE_BASE_URL: ${PURPLEMCP_CONSOLE_BASE_URL}
       PURPLEMCP_CONSOLE_TOKEN: ${PURPLEMCP_CONSOLE_TOKEN}
