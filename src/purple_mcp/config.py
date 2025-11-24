@@ -45,6 +45,7 @@ PURPLE_AI_BUILD_HASH_ENV: Final[str] = f"{ENV_PREFIX}PURPLE_AI_BUILD_HASH"
 PURPLE_AI_CONSOLE_VERSION_ENV: Final[str] = f"{ENV_PREFIX}PURPLE_AI_CONSOLE_VERSION"
 ENVIRONMENT_ENV: Final[str] = f"{ENV_PREFIX}ENV"
 LOGFIRE_TOKEN_ENV: Final[str] = f"{ENV_PREFIX}LOGFIRE_TOKEN"
+STATELESS_HTTP_ENV = f"{ENV_PREFIX}STATELESS_HTTP"
 
 
 class Settings(BaseSettings):
@@ -168,6 +169,12 @@ class Settings(BaseSettings):
         default=None,
         description="Optional Pydantic Logfire token for observability",
         validation_alias=LOGFIRE_TOKEN_ENV,
+    )
+
+    stateless_http: bool | None = Field(
+        default=False,
+        description="Stateless mode (new transport per request)",
+        validation_alias=STATELESS_HTTP_ENV,
     )
 
     @field_validator("sentinelone_console_base_url")
