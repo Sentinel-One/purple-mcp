@@ -76,7 +76,7 @@ def _apply_environment_overrides(
     console_base_url: str | None,
     graphql_endpoint: str | None,
     alerts_graphql_endpoint: str | None,
-    stateless_http: bool
+    stateless_http: bool | None
 ) -> None:
     """Apply CLI argument values to environment variables.
 
@@ -89,6 +89,7 @@ def _apply_environment_overrides(
         console_base_url: Base URL for the console
         graphql_endpoint: GraphQL endpoint path
         alerts_graphql_endpoint: Alerts GraphQL endpoint path
+        stateless_http: Uses true stateless mode (new transport per request)
     """
     if sdl_api_token:
         os.environ[f"{ENV_PREFIX}SDL_READ_LOGS_TOKEN"] = sdl_api_token
