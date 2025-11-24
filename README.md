@@ -58,6 +58,19 @@ docker run -p 8000:8000 \
   purple-mcp:latest
 ```
 
+### Using Amazon Bedrock AgentCore
+```bash
+# Subscribe to Purple AI MCP Server via AWS Marketplace
+
+#Prepare Environment Variables
+PURPLEMCP_CONSOLE_BASE_URL=https://your-console.sentinelone.net
+PURPLEMCP_CONSOLE_TOKEN=your-token
+MCP_MODE=streamable-http 
+PURPLEMCP_STATELESS_HTTP=True
+```
+Follow instructions for Amazon Bedrock AgentCore Deployment [here](BEDROCK_AGENTCORE_DEPLOYMENT.md)
+
+
 For production deployments, see [Deployment Guide](DOCKER.md).
 
 **Note:** Purple AI MCP does not include built-in authentication. For network-exposed deployments, place it behind a reverse proxy or load balancer. See [Production Setup](PRODUCTION_SETUP.md) for cloud load balancer configurations (AWS ALB, GCP Cloud Load Balancing, Azure Application Gateway) or nginx examples for self-hosted deployments.
@@ -189,6 +202,7 @@ We suggest you **do not** expose Purple AI MCP on a network at this time, as the
 ## Environment Variables
 - `PURPLEMCP_CONSOLE_TOKEN` - Service user token (Account or Site level)
 - `PURPLEMCP_CONSOLE_BASE_URL` - Console URL (e.g., https://console.sentinelone.net)
+- `PURPLEMCP_STATELESS_HTTP` - For use with deployment in Amazon Bedrock Agent Core - Detailed instructions can be found [here](BEDROCK_AGENTCORE_DEPLOYMENT.md)
 
 
 ## Development
