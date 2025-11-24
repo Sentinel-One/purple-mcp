@@ -107,7 +107,7 @@ class TestCLIArgumentParsing:
             assert call_args[1]["port"] == 9000
             assert call_args[1]["log_level"] == "warning"
 
-            mock_app.http_app.assert_called_once_with(transport="sse")
+            mock_app.http_app.assert_called_once_with(transport="sse", stateless_http=False)
             assert result.exit_code == 0
 
     def test_streamable_http_mode_options(self) -> None:
@@ -144,7 +144,7 @@ class TestCLIArgumentParsing:
             assert call_args[1]["port"] == 8080
             assert call_args[1]["log_level"] == "info"  # verbose mode
 
-            mock_app.http_app.assert_called_once_with(transport="streamable-http")
+            mock_app.http_app.assert_called_once_with(transport="streamable-http", stateless_http=False)
             assert result.exit_code == 0
 
     def test_verbose_logging_setup(self) -> None:
@@ -353,7 +353,7 @@ class TestTransportModes:
                 main, ["--mode", "sse", "--host", "127.0.0.1", "--port", "8001"]
             )
 
-            mock_app.http_app.assert_called_once_with(transport="sse")
+            mock_app.http_app.assert_called_once_with(transport="sse", stateless_http=False)
             mock_uvicorn.assert_called_once()
 
             # Check uvicorn call arguments
@@ -379,7 +379,7 @@ class TestTransportModes:
 
             result = runner.invoke(main, ["--mode", "streamable-http"])
 
-            mock_app.http_app.assert_called_once_with(transport="streamable-http")
+            mock_app.http_app.assert_called_once_with(transport="streamable-http", stateless_http=False)
             mock_uvicorn.assert_called_once()
 
             assert (
@@ -432,7 +432,7 @@ class TestModeDispatcher:
             _run_mode("sse", host="127.0.0.1", port=8001, verbose=False)
 
             mock_run_uvicorn.assert_called_once_with(
-                "sse", host="127.0.0.1", port=8001, verbose=False, allow_remote_access=False
+                "sse", host="127.0.0.1", port=8001, verbose=False, allow_remote_access=False, stateless_http=False
             )
 
     def test_streamable_http_mode_dispatch(self) -> None:
@@ -444,6 +444,7 @@ class TestModeDispatcher:
                 port=9000,
                 verbose=True,
                 allow_remote_access=True,
+                stateless_http=False
             )
 
             mock_run_uvicorn.assert_called_once_with(
@@ -452,6 +453,7 @@ class TestModeDispatcher:
                 port=9000,
                 verbose=True,
                 allow_remote_access=True,
+                stateless_http=False
             )
 
     def test_case_insensitive_mode_dispatch(self) -> None:
@@ -465,7 +467,7 @@ class TestModeDispatcher:
             _run_mode("SSE", host="localhost", port=8000, verbose=False)
 
             mock_run_uvicorn.assert_called_once_with(
-                "sse", host="localhost", port=8000, verbose=False, allow_remote_access=False
+                "sse", host="localhost", port=8000, verbose=False, allow_remote_access=False, stateless_http=False
             )
 
 
@@ -589,7 +591,7 @@ class TestCLIIntegration:
             mock_settings.assert_called_once()
 
             # Should start server
-            mock_app.http_app.assert_called_once_with(transport="sse")
+            mock_app.http_app.assert_called_once_with(transport="sse", stateless_http=False)
             mock_uvicorn.assert_called_once()
 
             assert result.exit_code == 0
@@ -628,9 +630,9 @@ class TestCLIIntegration:
             else:
                 mock_uvicorn.assert_called_once()
                 if mode == "sse":
-                    mock_app.http_app.assert_called_once_with(transport="sse")
+                    mock_app.http_app.assert_called_once_with(transport="sse", stateless_http=False)
                 else:  # streamable-http
-                    mock_app.http_app.assert_called_once_with(transport="streamable-http")
+                    mock_app.http_app.assert_called_once_with(transport="streamable-http", stateless_http=False)
 
             assert result.exit_code == 0
 

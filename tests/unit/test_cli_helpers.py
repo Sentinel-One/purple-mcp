@@ -59,6 +59,7 @@ class TestApplyEnvironmentOverrides:
             console_base_url="https://example.test",
             graphql_endpoint="/custom",
             alerts_graphql_endpoint="/custom/alerts",
+            stateless_http=True
         )
 
         assert os.environ[f"{ENV_PREFIX}SDL_READ_LOGS_TOKEN"] == "sdl"
@@ -66,6 +67,7 @@ class TestApplyEnvironmentOverrides:
         assert os.environ[f"{ENV_PREFIX}CONSOLE_BASE_URL"] == "https://example.test"
         assert os.environ[f"{ENV_PREFIX}CONSOLE_GRAPHQL_ENDPOINT"] == "/custom"
         assert os.environ[f"{ENV_PREFIX}ALERTS_GRAPHQL_ENDPOINT"] == "/custom/alerts"
+        assert os.environ[f"{ENV_PREFIX}STATELESS_HTTP"] == "True"
 
     def test_defaults_are_not_overridden(self) -> None:
         """Default endpoint should *not* be written to the environment."""
@@ -78,10 +80,12 @@ class TestApplyEnvironmentOverrides:
             console_base_url=None,
             graphql_endpoint="/web/api/v2.1/graphql",
             alerts_graphql_endpoint="/web/api/v2.1/unifiedalerts/graphql",
+            stateless_http=None
         )
 
         assert f"{ENV_PREFIX}CONSOLE_GRAPHQL_ENDPOINT" not in os.environ
         assert f"{ENV_PREFIX}ALERTS_GRAPHQL_ENDPOINT" not in os.environ
+        assert f"{ENV_PREFIX}STATELESS_HTTP" not in os.environ
 
 
 class TestCreateSettings:
