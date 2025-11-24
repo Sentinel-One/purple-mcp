@@ -45,8 +45,8 @@ import fastmcp
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from purple_mcp.observability import initialize_logfire, instrument_starlette_app
 from purple_mcp.config import settings
+from purple_mcp.observability import initialize_logfire, instrument_starlette_app
 from purple_mcp.tools.alerts import (
     GET_ALERT_DESCRIPTION,
     GET_ALERT_HISTORY_DESCRIPTION,
