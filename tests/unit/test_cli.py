@@ -147,6 +147,46 @@ class TestCLIArgumentParsing:
             mock_app.http_app.assert_called_once_with(transport="streamable-http", stateless_http=False)
             assert result.exit_code == 0
 
+    def test_streamable_http_mode_options_and_stateless(self) -> None:
+        """Test CLI with streamable-http mode."""
+        runner = CliRunner()
+
+        with (
+            patch("purple_mcp.cli.Settings") as mock_settings,
+            patch("purple_mcp.cli.uvicorn.run") as mock_uvicorn,
+            patch("purple_mcp.server.app") as mock_app,
+        ):
+            # Mock successful configuration
+            mock_settings.return_value = Mock()
+            mock_settings.return_value.graphql_full_url = "https://test.test/graphql"
+            mock_app.http_app.return_value = Mock()
+
+            result = runner.invoke(
+                main,
+                [
+                    "--mode",
+                    "streamable-http",
+                    "--host",
+                    "localhost",
+                    "--port",
+                    "8080",
+                    "--verbose",
+                    "--stateless-http",
+                ],
+            )
+
+            # Should start uvicorn with streamable-http transport
+            mock_uvicorn.assert_called_once()
+            call_args = mock_uvicorn.call_args
+            assert call_args[1]["host"] == "localhost"
+            assert call_args[1]["port"] == 8080
+            assert call_args[1]["log_level"] == "info"  # verbose mode
+
+            mock_app.http_app.assert_called_once_with(
+                transport="streamable-http", stateless_http=True
+            )
+            assert result.exit_code == 0
+
     def test_verbose_logging_setup(self) -> None:
         """Test verbose logging configuration."""
         runner = CliRunner()
