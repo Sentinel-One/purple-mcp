@@ -135,6 +135,7 @@ async def health_check(request: Request) -> JSONResponse:
     """Health check endpoint."""
     return JSONResponse({"status": "ok"})
 
+
 http_app = (
     app.http_app(transport="sse", stateless_http=settings.stateless_http)
     if settings

@@ -59,7 +59,7 @@ class TestApplyEnvironmentOverrides:
             console_base_url="https://example.test",
             graphql_endpoint="/custom",
             alerts_graphql_endpoint="/custom/alerts",
-            stateless_http=True
+            stateless_http=True,
         )
 
         assert os.environ[f"{ENV_PREFIX}SDL_READ_LOGS_TOKEN"] == "sdl"
@@ -80,7 +80,7 @@ class TestApplyEnvironmentOverrides:
             console_base_url=None,
             graphql_endpoint="/web/api/v2.1/graphql",
             alerts_graphql_endpoint="/web/api/v2.1/unifiedalerts/graphql",
-            stateless_http=None
+            stateless_http=None,
         )
 
         assert f"{ENV_PREFIX}CONSOLE_GRAPHQL_ENDPOINT" not in os.environ

@@ -76,7 +76,7 @@ def _apply_environment_overrides(
     console_base_url: str | None,
     graphql_endpoint: str | None,
     alerts_graphql_endpoint: str | None,
-    stateless_http: bool | None
+    stateless_http: bool | None,
 ) -> None:
     """Apply CLI argument values to environment variables.
 
@@ -244,7 +244,7 @@ def _run_uvicorn(
     port: int,
     verbose: bool,
     allow_remote_access: bool,
-    stateless_http: bool
+    stateless_http: bool,
 ) -> None:  # pragma: no cover - uvicorn is mocked in unit-tests
     """Run the HTTP/SSE transport using *uvicorn*."""
     # Validate host binding for security
@@ -285,7 +285,7 @@ def _run_mode(
     verbose: bool,
     no_banner: bool = False,
     allow_remote_access: bool = False,
-    stateless_http: bool = False
+    stateless_http: bool = False,
 ) -> None:
     """Dispatch to the appropriate server runner for *mode*."""
     mode_normalised = mode.lower()
@@ -293,7 +293,12 @@ def _run_mode(
     runners: Mapping[str, Callable[[], None]] = {
         "stdio": lambda: _run_stdio(verbose, no_banner),
         "sse": lambda: _run_uvicorn(
-            "sse", host=host, port=port, verbose=verbose, allow_remote_access=allow_remote_access, stateless_http=stateless_http
+            "sse",
+            host=host,
+            port=port,
+            verbose=verbose,
+            allow_remote_access=allow_remote_access,
+            stateless_http=stateless_http,
         ),
         "streamable-http": lambda: _run_uvicorn(
             "streamable-http",
@@ -301,7 +306,7 @@ def _run_mode(
             port=port,
             verbose=verbose,
             allow_remote_access=allow_remote_access,
-            stateless_http=stateless_http
+            stateless_http=stateless_http,
         ),
     }
 
@@ -390,7 +395,7 @@ def main(
     verbose: bool,
     banner: bool,
     allow_remote_access: bool,
-    stateless_http: bool
+    stateless_http: bool,
 ) -> None:
     """Purple MCP Server - AI monitoring and analysis tool."""
     _setup_logging(verbose)
@@ -404,7 +409,7 @@ def main(
         console_base_url=console_base_url,
         graphql_endpoint=graphql_endpoint,
         alerts_graphql_endpoint=alerts_graphql_endpoint,
-        stateless_http=stateless_http
+        stateless_http=stateless_http,
     )
 
     settings = _create_settings()
@@ -421,7 +426,7 @@ def main(
         verbose=verbose,
         no_banner=not banner,
         allow_remote_access=allow_remote_access,
-        stateless_http=stateless_http
+        stateless_http=stateless_http,
     )
 
 
