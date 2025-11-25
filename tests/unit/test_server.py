@@ -12,7 +12,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastmcp import Client
-from fastmcp.server.http import StreamableHTTPASGIApp, StreamableHTTPSessionManager
+from fastmcp.server.http import StreamableHTTPASGIApp
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.routing import Route
 
 from purple_mcp import server
