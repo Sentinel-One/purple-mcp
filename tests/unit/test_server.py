@@ -14,7 +14,6 @@ import pytest
 from fastmcp import Client
 
 from purple_mcp.openai_schema import OpenAISchemaGenerator, OpenAIToolExtractor
-from purple_mcp.server import app, http_app
 
 
 class TestServerInitialization:
@@ -22,10 +21,14 @@ class TestServerInitialization:
 
     def test_server_name(self) -> None:
         """Test that the server has the correct name."""
+        from purple_mcp.server import app
+
         assert app.name == "PurpleAIMCP"
 
     def test_http_app_creation(self) -> None:
         """Test that HTTP app is created with correct transport."""
+        from purple_mcp.server import http_app
+
         assert http_app is not None
         # The http_app should be a Starlette application instance
         assert hasattr(http_app, "routes")
@@ -37,6 +40,8 @@ class TestHealthEndpoint:
     @pytest.mark.asyncio
     async def test_health_check_success(self) -> None:
         """Test health check endpoint returns correct status."""
+        from purple_mcp.server import app, http_app
+
         async with Client(app) as _:
             # Test the health endpoint directly through the server
             # Since it's a custom route, we need to test it via HTTP
@@ -51,6 +56,8 @@ class TestHealthEndpoint:
     @pytest.mark.asyncio
     async def test_health_check_endpoint_method(self) -> None:
         """Test health check endpoint only accepts GET requests."""
+
+        from purple_mcp.server import http_app
         from starlette.testclient import TestClient
 
         test_client = TestClient(http_app)
@@ -70,6 +77,8 @@ class TestToolRegistration:
     @pytest.mark.asyncio
     async def test_purple_ai_tool_registered(self, valid_env_config: dict[str, str]) -> None:
         """Test that purple_ai tool is properly registered."""
+        from purple_mcp.server import app
+
         async with Client(app) as client:
             # List all available tools
             tools = await client.list_tools()
@@ -92,6 +101,8 @@ class TestToolRegistration:
     @pytest.mark.asyncio
     async def test_powerquery_tool_registered(self, valid_env_config: dict[str, str]) -> None:
         """Test that powerquery tool is properly registered."""
+        from purple_mcp.server import app
+
         async with Client(app) as client:
             # List all available tools
             tools = await client.list_tools()
@@ -119,6 +130,8 @@ class TestToolRegistration:
         self, valid_env_config: dict[str, str]
     ) -> None:
         """Test that get_timestamp_range tool is properly registered."""
+        from purple_mcp.server import app
+
         async with Client(app) as client:
             # List all available tools
             tools = await client.list_tools()
@@ -155,6 +168,8 @@ class TestToolExecution:
     async def test_purple_ai_tool_execution_error_without_config(
         self, clean_env: dict[str, str | None]
     ) -> None:
+        from purple_mcp.server import app
+
         """Test purple_ai tool execution fails gracefully without configuration."""
         async with Client(app) as client:
             # Try to call purple_ai tool without proper environment configuration
@@ -172,6 +187,8 @@ class TestToolExecution:
         self, clean_env: dict[str, str | None]
     ) -> None:
         """Test powerquery tool execution fails gracefully without configuration."""
+        from purple_mcp.server import app
+
         async with Client(app) as client:
             # Try to call powerquery tool without proper environment configuration
             with pytest.raises(Exception) as exc_info:
@@ -195,6 +212,8 @@ class TestToolExecution:
         self, valid_env_config: dict[str, str]
     ) -> None:
         """Test purple_ai tool execution with mocked dependencies."""
+        from purple_mcp.server import app
+
         # Mock the settings and ask_purple function to avoid external API calls
         with (
             patch("purple_mcp.tools.purple_ai.get_settings") as mock_get_settings,
@@ -236,6 +255,7 @@ class TestToolExecution:
 
         # Mock the result structure
         from types import SimpleNamespace
+        from purple_mcp.server import app
 
         mock_results = AsyncMock()
         mock_results.match_count = 5
@@ -277,6 +297,8 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_invalid_tool_name(self) -> None:
         """Test calling a non-existent tool."""
+        from purple_mcp.server import app
+
         async with Client(app) as client:
             with pytest.raises(Exception) as exc_info:
                 await client.call_tool("nonexistent_tool", {"param": "value"})
@@ -289,6 +311,8 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_tool_with_invalid_parameters(self, valid_env_config: dict[str, str]) -> None:
         """Test calling a tool with invalid parameters."""
+        from purple_mcp.server import app
+
         async with Client(app) as client:
             # Test purple_ai with missing required parameter
             with pytest.raises((Exception, ValueError, TypeError)):
@@ -301,6 +325,8 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_tool_with_wrong_parameter_types(self, valid_env_config: dict[str, str]) -> None:
         """Test calling a tool with wrong parameter types."""
+        from purple_mcp.server import app
+
         async with Client(app) as client:
             # Test powerquery with wrong timestamp types
             with pytest.raises((Exception, ValueError, TypeError)):
@@ -320,6 +346,8 @@ class TestServerIntegration:
     @pytest.mark.asyncio
     async def test_server_initialization_complete(self, valid_env_config: dict[str, str]) -> None:
         """Test that server initializes completely with all components."""
+        from purple_mcp.server import app
+
         async with Client(app) as client:
             # Test that we can connect to the server
             assert client is not None
@@ -336,6 +364,8 @@ class TestServerIntegration:
 
     def test_http_app_has_correct_routes(self) -> None:
         """Test that HTTP app has the expected routes."""
+
+        from purple_mcp.server import http_app
         from starlette.testclient import TestClient
 
         test_client = TestClient(http_app)
@@ -352,6 +382,7 @@ class TestServerIntegration:
     async def test_concurrent_tool_calls(self, valid_env_config: dict[str, str]) -> None:
         """Test that server can handle concurrent tool calls."""
         import asyncio
+        from purple_mcp.server import app
 
         # Mock the dependencies to avoid external calls
         with (
@@ -433,6 +464,8 @@ class TestOpenAICompatibility:
         with different signatures (async vs sync, str vs dict returns, etc.)
         This is appropriate in test code for validating schema generation.
         """
+        from purple_mcp.server import app
+
         try:
             # Use public API to get registered tools (preferred method)
             tools_dict = await app.get_tools()
