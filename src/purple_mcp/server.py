@@ -42,6 +42,7 @@ Dependencies:
 """
 
 import contextlib
+from typing import Literal
 
 import fastmcp
 from fastmcp.server.http import StarletteWithLifespan
@@ -142,21 +143,25 @@ async def health_check(request: Request) -> JSONResponse:
 settings = None
 
 # Use get_settings to ensure usage of lru_cache decorator.
-with contextlib.suppress(BaseException):
+with contextlib.suppress(Exception):
     settings = get_settings()
 
 
-def get_http_app(app: fastmcp.FastMCP, settings: Settings | None) -> StarletteWithLifespan:
-    """Returns a http_app using environment variable settings."""
-    return (
-        app.http_app(transport=settings.transport_mode, stateless_http=settings.stateless_http)
-        if settings and settings.transport_mode in ("streamable-http", "http")
-        # stateless_http arg has no effect if using "sse" transport mode when instantiating a http_app, AND there
-        # is only a choice of three transport modes, hence if settings is None, it is safe to assume "sse" transport
-        # mode even if the settings object is None - this also preserves the original module-level implementation of
-        # http_app.
-        else app.http_app(transport="sse")
-    )
+def get_http_app(
+    mcp_app: fastmcp.FastMCP[None], settings: Settings | None
+) -> StarletteWithLifespan:
+    """Returns a http_app using environment variable settings.
+
+    For stdio mode or when settings is None, defaults to SSE transport for the HTTP app.
+    The stateless_http setting only applies to streamable-http and http transports.
+    """
+    if settings and settings.transport_mode in ("streamable-http", "http"):
+        # Type narrowing: transport_mode is "streamable-http" or "http" here
+        transport: Literal["http", "streamable-http"] = (
+            "streamable-http" if settings.transport_mode == "streamable-http" else "http"
+        )
+        return mcp_app.http_app(transport=transport, stateless_http=settings.stateless_http)
+    return mcp_app.http_app(transport="sse")
 
 
 http_app = get_http_app(app, settings)

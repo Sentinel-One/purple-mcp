@@ -128,7 +128,6 @@ docstring-code-format = true
 
 [lint.per-file-ignores]
 "__init__.py" = ["F401"]  # unused-import: Allow unused imports in __init__.py files
-"src/indigo_workshop/**" = ["C901"]  # complex-structure: Allow complex functions in workshop code
 
 [lint.isort]
 combine-as-imports = true

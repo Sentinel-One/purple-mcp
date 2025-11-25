@@ -172,15 +172,15 @@ class Settings(BaseSettings):
         validation_alias=LOGFIRE_TOKEN_ENV,
     )
 
-    stateless_http: bool | None = Field(
+    stateless_http: bool = Field(
         default=False,
         description="Stateless mode (new transport per request)",
         validation_alias=STATELESS_HTTP_ENV,
     )
 
-    transport_mode: Literal["http", "streamable-http", "sse"] = Field(
-        default="sse",
-        description="Stateless mode (new transport per request)",
+    transport_mode: Literal["stdio", "http", "streamable-http", "sse"] = Field(
+        default="stdio",
+        description="MCP transport mode (stdio, http, streamable-http, or sse)",
         validation_alias=TRANSPORT_MODE_ENV,
     )
 

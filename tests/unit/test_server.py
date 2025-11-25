@@ -24,7 +24,7 @@ class TestServerInitialization:
     """Tests for server initialization and configuration."""
 
     def _test_http_app_mode(
-        self, mode: Literal["http", "streamable-http", "sse"], stateless_http: bool
+        self, mode: Literal["stdio", "http", "streamable-http", "sse"], stateless_http: bool
     ) -> None:
         mock_settings = MagicMock()
         mock_settings.transport_mode = mode
@@ -47,8 +47,8 @@ class TestServerInitialization:
                 session_manager = cast(StreamableHTTPSessionManager, endpoint.session_manager)
                 assert session_manager.stateless == stateless_http
             else:
-                # stateless setting doesn't apply to sse mode - the prop isn't accessible in any
-                # meaningful sense when http_app is initialized using sse.
+                # stateless setting doesn't apply to sse or stdio modes - for stdio the http_app
+                # falls back to sse, and for sse the prop isn't accessible in any meaningful sense.
                 pass
 
     def test_server_name(self) -> None:
@@ -70,9 +70,11 @@ class TestServerInitialization:
         self._test_http_app_mode("http", stateless_http=True)
         self._test_http_app_mode("sse", stateless_http=True)
         self._test_http_app_mode("streamable-http", stateless_http=True)
+        self._test_http_app_mode("stdio", stateless_http=True)
         self._test_http_app_mode("http", stateless_http=False)
         self._test_http_app_mode("sse", stateless_http=False)
         self._test_http_app_mode("streamable-http", stateless_http=False)
+        self._test_http_app_mode("stdio", stateless_http=False)
 
 
 class TestHealthEndpoint:

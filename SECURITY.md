@@ -8,8 +8,7 @@ This guide documents the security expectations for every contributor and operato
 
 - **Project maintainers** provide secure-by-default libraries, tools, and configuration primitives.
 - **Operators and deployers** are responsible for securing runtime environments, network boundaries, secrets, observability pipelines, and user access.
-- **Users running Purple MCP as a remote service** must place the instance behind a reverse proxy (for example, Nginx, Envoy, or an API gateway) that enforces strong authentication and authorization. Purple MCP does not ship its own auth layer.
-- **Hosted MCP offering**: SentinelOne plans to launch an official hosted Purple MCP service in early 2026. Until that release, all external-facing deployments demand operator-managed network controls and authentication.
+- **Users running Purple MCP as a remote service** must place the instance behind a reverse proxy (for example, Nginx, Envoy, or an API gateway) that enforces strong authentication and authorization. Purple MCP does not ship its own auth layer. All external-facing deployments require operator-managed network controls and authentication.
 
 ## Threat Model Overview
 
@@ -60,8 +59,7 @@ This guide documents the security expectations for every contributor and operato
   - Terminate TLS at a reverse proxy that enforces strong client authentication (SAML/OIDC SSO, mutual TLS, signed API tokens).
   - Implement rate limiting, audit logging, and IP allowlists at the proxy layer.
   - Restrict network access to SentinelOne control planes and internal assets required by your workflows.
-- Document all access paths and routinely review who can reach the MCP instance.
-- Upcoming hosted service (early 2026) will provide managed authentication, centralized auditing, and turnkey deployments. Until then, the operator bears full responsibility for access control.
+- Document all access paths and routinely review who can reach the MCP instance. The operator bears full responsibility for access control.
 
 ## Deployment Guidance
 
@@ -85,10 +83,6 @@ This guide documents the security expectations for every contributor and operato
 - Pin image digests, scan containers for vulnerabilities, and keep base images up to date.
 - Leverage orchestrator features (Kubernetes NetworkPolicies, PodSecurityStandards, IAM roles for service accounts).
 - Inject configuration via secrets and config maps—never bake secrets into container images.
-
-### Anticipated Hosted MCP (Early 2026)
-
-- A managed SentinelOne-hosted MCP service is planned to launch in early 2026, delivering integrated authentication, network isolation, and operational monitoring.
 
 ## Logging and Telemetry
 
@@ -136,6 +130,5 @@ This guide documents the security expectations for every contributor and operato
 
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) – Development workflow and coding standards.
 - [`README.md`](README.md) – Project overview and setup instructions.
-- SentinelOne internal security policies and the upcoming hosted MCP documentation (target release: early 2026).
 
 Security is a continuous effort. Revisit this guide regularly, automate compliance checks where possible, and surface improvements to the team so that Purple MCP remains secure throughout its lifecycle.

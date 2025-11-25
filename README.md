@@ -10,8 +10,6 @@
 
 Purple AI MCP Server allows you to access SentinelOne Services with any MCP client.
 
-**Coming Soon**: In early 2026, we will allow you to connect to this service hosted by SentinelOne.
-
 ## Features
 
 This server exposes SentinelOne's platform through the Model Context Protocol:
@@ -202,7 +200,8 @@ We suggest you **do not** expose Purple AI MCP on a network at this time, as the
 ## Environment Variables
 - `PURPLEMCP_CONSOLE_TOKEN` - Service user token (Account or Site level)
 - `PURPLEMCP_CONSOLE_BASE_URL` - Console URL (e.g., https://console.sentinelone.net)
-- `PURPLEMCP_STATELESS_HTTP` - For use with deployment in Amazon Bedrock Agent Core - Detailed instructions can be found [here](BEDROCK_AGENTCORE_DEPLOYMENT.md)
+- `PURPLEMCP_TRANSPORT_MODE` - MCP transport mode: `stdio` (default), `sse`, or `streamable-http`
+- `PURPLEMCP_STATELESS_HTTP` - Enable stateless HTTP mode for serverless deployments (e.g., Amazon Bedrock AgentCore) - see [deployment guide](BEDROCK_AGENTCORE_DEPLOYMENT.md)
 
 
 ## Development

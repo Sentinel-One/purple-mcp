@@ -7,9 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - YYYY-MM-DD
 
-## Changed
+## [0.6.0] - 2025-11-25
+
+### Added
+
+- Amazon Bedrock AgentCore deployment support with `--stateless-http` flag
+- New `PURPLEMCP_STATELESS_HTTP` environment variable for stateless HTTP mode
+- New `PURPLEMCP_TRANSPORT_MODE` environment variable for transport configuration
+- Comprehensive AWS Bedrock deployment guide (BEDROCK_AGENTCORE_DEPLOYMENT.md)
+- IAM and trust policy templates for AWS Bedrock AgentCore
+
+### Changed
 
 - Updated default values for client details to be more accurate
+- Transport mode now configurable via environment variable
+- Improved documentation for environment variables in README
+
+### Fixed
+
+- Exception handling in server.py uses `Exception` instead of `BaseException`
+- Type annotations for `stateless_http` field (removed unnecessary `| None`)
+- Corrected `transport_mode` field description in Settings
 
 ## [0.5.1] - 2025-11-08
 
@@ -72,5 +90,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automated CI/CD with GitHub Actions
 - Comprehensive documentation (README, CONTRIBUTING, SECURITY)
 
+[0.6.0]: https://github.com/Sentinel-One/purple-mcp/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/Sentinel-One/purple-mcp/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Sentinel-One/purple-mcp/releases/tag/v0.5.0
