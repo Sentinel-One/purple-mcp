@@ -7,7 +7,6 @@ health check endpoint, and HTTP app configuration.
 import inspect
 import uuid
 from collections.abc import Callable
-from importlib import reload
 from typing import Any, Literal, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -16,6 +15,7 @@ from fastmcp import Client
 from fastmcp.server.http import StreamableHTTPASGIApp, StreamableHTTPSessionManager
 from starlette.routing import Route
 
+from purple_mcp import server
 from purple_mcp.openai_schema import OpenAISchemaGenerator, OpenAIToolExtractor
 
 
@@ -25,34 +25,30 @@ class TestServerInitialization:
     def _test_http_app_mode(
         self, mode: Literal["http", "streamable-http", "sse"], stateless_http: bool
     ) -> None:
-        with patch("purple_mcp.config.get_settings") as mock_get_settings:
-            mock_get_settings.return_value.transport_mode = mode
-            mock_get_settings.return_value.stateless_http = stateless_http
+        mock_settings = MagicMock()
+        mock_settings.transport_mode = mode
+        mock_settings.stateless_http = stateless_http
 
-            from purple_mcp import server
+        http_app = server.get_http_app(server.app, mock_settings)
 
-            reload(server)
+        assert http_app is not None
+        # The http_app should be a Starlette application instance
+        assert hasattr(http_app, "routes")
 
-            http_app = server.http_app
+        for route in http_app.routes:
+            _route = cast(Route, route)
+            if _route.name == "health_check":
+                continue
 
-            assert http_app is not None
-            # The http_app should be a Starlette application instance
-            assert hasattr(http_app, "routes")
+            if mode in ["http", "streamable-http"]:
+                endpoint: StreamableHTTPASGIApp = cast(StreamableHTTPASGIApp, _route.endpoint)
 
-            for route in http_app.routes:
-                _route = cast(Route, route)
-                if _route.name == "health_check":
-                    continue
-
-                if mode in ["http", "streamable-http"]:
-                    endpoint: StreamableHTTPASGIApp = cast(StreamableHTTPASGIApp, _route.endpoint)
-
-                    session_manager = cast(StreamableHTTPSessionManager, endpoint.session_manager)
-                    assert session_manager.stateless == stateless_http
-                else:
-                    # stateless setting doesn't apply to sse mode - the prop isn't accessible in any
-                    # meaningful sense when http_app is initialized using sse.
-                    pass
+                session_manager = cast(StreamableHTTPSessionManager, endpoint.session_manager)
+                assert session_manager.stateless == stateless_http
+            else:
+                # stateless setting doesn't apply to sse mode - the prop isn't accessible in any
+                # meaningful sense when http_app is initialized using sse.
+                pass
 
     def test_server_name(self) -> None:
         """Test that the server has the correct name."""
@@ -68,22 +64,13 @@ class TestServerInitialization:
         # The http_app should be a Starlette application instance
         assert hasattr(http_app, "routes")
 
-    def test_http_app_http_mode_stateless(self):
+    def test_http_app_permutations(self) -> None:
+        """Verify various settings that can be passed to http_app."""
         self._test_http_app_mode("http", stateless_http=True)
-
-    def test_http_app_sse_mode_stateless(self):
         self._test_http_app_mode("sse", stateless_http=True)
-
-    def test_http_app_streamable_http_mode_stateless(self):
         self._test_http_app_mode("streamable-http", stateless_http=True)
-
-    def test_http_app_http_mode(self):
         self._test_http_app_mode("http", stateless_http=False)
-
-    def test_http_app_sse_mode(self):
         self._test_http_app_mode("sse", stateless_http=False)
-
-    def test_http_app_streamable_http_mode(self):
         self._test_http_app_mode("streamable-http", stateless_http=False)
 
 
@@ -221,9 +208,9 @@ class TestToolExecution:
     async def test_purple_ai_tool_execution_error_without_config(
         self, clean_env: dict[str, str | None]
     ) -> None:
+        """Test purple_ai tool execution fails gracefully without configuration."""
         from purple_mcp.server import app
 
-        """Test purple_ai tool execution fails gracefully without configuration."""
         async with Client(app) as client:
             # Try to call purple_ai tool without proper environment configuration
             with pytest.raises(Exception) as exc_info:

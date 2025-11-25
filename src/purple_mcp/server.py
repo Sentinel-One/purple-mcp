@@ -41,11 +41,14 @@ Dependencies:
     starlette: Underlying ASGI toolkit used by FastMCP for HTTP exposure.
 """
 
+import contextlib
+
 import fastmcp
+from fastmcp.server.http import StarletteWithLifespan
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from purple_mcp.config import get_settings
+from purple_mcp.config import Settings, get_settings
 from purple_mcp.observability import initialize_logfire, instrument_starlette_app
 from purple_mcp.tools.alerts import (
     GET_ALERT_DESCRIPTION,
@@ -139,20 +142,24 @@ async def health_check(request: Request) -> JSONResponse:
 settings = None
 
 # Use get_settings to ensure usage of lru_cache decorator.
-try:
+with contextlib.suppress(BaseException):
     settings = get_settings()
-except:
-    pass
 
-# stateless_http arg has no effect if using "sse" transport mode when instantiating a http_app, AND there
-# is only a choice of three transport modes, hence if settings is None, it is safe to assume "sse" transport
-# mode even if the settings object is None - this also preserves the original module-level implementation of
-# http_app.
-http_app = (
-    app.http_app(transport=settings.transport_mode, stateless_http=settings.stateless_http)
-    if settings and settings.transport_mode in ("streamable-http", "http")
-    else app.http_app(transport="sse")
-)
+
+def get_http_app(app: fastmcp.FastMCP, settings: Settings | None) -> StarletteWithLifespan:
+    """Returns a http_app using environment variable settings."""
+    return (
+        app.http_app(transport=settings.transport_mode, stateless_http=settings.stateless_http)
+        if settings and settings.transport_mode in ("streamable-http", "http")
+        # stateless_http arg has no effect if using "sse" transport mode when instantiating a http_app, AND there
+        # is only a choice of three transport modes, hence if settings is None, it is safe to assume "sse" transport
+        # mode even if the settings object is None - this also preserves the original module-level implementation of
+        # http_app.
+        else app.http_app(transport="sse")
+    )
+
+
+http_app = get_http_app(app, settings)
 
 # Instrument the Starlette app with Logfire if enabled
 instrument_starlette_app(http_app)
