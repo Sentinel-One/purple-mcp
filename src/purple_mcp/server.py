@@ -45,7 +45,7 @@ import fastmcp
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from purple_mcp.config import settings
+from purple_mcp.config import get_settings
 from purple_mcp.observability import initialize_logfire, instrument_starlette_app
 from purple_mcp.tools.alerts import (
     GET_ALERT_DESCRIPTION,
@@ -136,9 +136,21 @@ async def health_check(request: Request) -> JSONResponse:
     return JSONResponse({"status": "ok"})
 
 
+settings = None
+
+# Use get_settings to ensure usage of lru_cache decorator.
+try:
+    settings = get_settings()
+except:
+    pass
+
+# stateless_http arg has no effect if using "sse" transport mode when instantiating a http_app, AND there
+# is only a choice of three transport modes, hence if settings is None, it is safe to assume "sse" transport
+# mode even if the settings object is None - this also preserves the original module-level implementation of
+# http_app.
 http_app = (
-    app.http_app(transport="sse", stateless_http=settings.stateless_http)
-    if settings
+    app.http_app(transport=settings.transport_mode, stateless_http=settings.stateless_http)
+    if settings and settings.transport_mode in ("streamable-http", "http")
     else app.http_app(transport="sse")
 )
 

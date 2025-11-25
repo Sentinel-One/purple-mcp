@@ -7,17 +7,52 @@ health check endpoint, and HTTP app configuration.
 import inspect
 import uuid
 from collections.abc import Callable
-from typing import Any
+from importlib import reload
+from typing import Any, Literal, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastmcp import Client
+from fastmcp.server.http import StreamableHTTPASGIApp, StreamableHTTPSessionManager
+from starlette.routing import Route
 
 from purple_mcp.openai_schema import OpenAISchemaGenerator, OpenAIToolExtractor
 
 
 class TestServerInitialization:
     """Tests for server initialization and configuration."""
+
+    def _test_http_app_mode(
+        self, mode: Literal["http", "streamable-http", "sse"], stateless_http: bool
+    ) -> None:
+        with patch("purple_mcp.config.get_settings") as mock_get_settings:
+            mock_get_settings.return_value.transport_mode = mode
+            mock_get_settings.return_value.stateless_http = stateless_http
+
+            from purple_mcp import server
+
+            reload(server)
+
+            http_app = server.http_app
+
+            assert http_app is not None
+            # The http_app should be a Starlette application instance
+            assert hasattr(http_app, "routes")
+
+            for route in http_app.routes:
+                _route = cast(Route, route)
+                if _route.name == "health_check":
+                    continue
+
+                if mode in ["http", "streamable-http"]:
+                    endpoint: StreamableHTTPASGIApp = cast(StreamableHTTPASGIApp, _route.endpoint)
+
+                    session_manager = cast(StreamableHTTPSessionManager, endpoint.session_manager)
+                    assert session_manager.stateless == stateless_http
+                else:
+                    # stateless setting doesn't apply to sse mode - the prop isn't accessible in any
+                    # meaningful sense when http_app is initialized using sse.
+                    pass
 
     def test_server_name(self) -> None:
         """Test that the server has the correct name."""
@@ -32,6 +67,24 @@ class TestServerInitialization:
         assert http_app is not None
         # The http_app should be a Starlette application instance
         assert hasattr(http_app, "routes")
+
+    def test_http_app_http_mode_stateless(self):
+        self._test_http_app_mode("http", stateless_http=True)
+
+    def test_http_app_sse_mode_stateless(self):
+        self._test_http_app_mode("sse", stateless_http=True)
+
+    def test_http_app_streamable_http_mode_stateless(self):
+        self._test_http_app_mode("streamable-http", stateless_http=True)
+
+    def test_http_app_http_mode(self):
+        self._test_http_app_mode("http", stateless_http=False)
+
+    def test_http_app_sse_mode(self):
+        self._test_http_app_mode("sse", stateless_http=False)
+
+    def test_http_app_streamable_http_mode(self):
+        self._test_http_app_mode("streamable-http", stateless_http=False)
 
 
 class TestHealthEndpoint:
@@ -56,9 +109,9 @@ class TestHealthEndpoint:
     @pytest.mark.asyncio
     async def test_health_check_endpoint_method(self) -> None:
         """Test health check endpoint only accepts GET requests."""
+        from starlette.testclient import TestClient
 
         from purple_mcp.server import http_app
-        from starlette.testclient import TestClient
 
         test_client = TestClient(http_app)
 
@@ -255,6 +308,7 @@ class TestToolExecution:
 
         # Mock the result structure
         from types import SimpleNamespace
+
         from purple_mcp.server import app
 
         mock_results = AsyncMock()
@@ -364,9 +418,9 @@ class TestServerIntegration:
 
     def test_http_app_has_correct_routes(self) -> None:
         """Test that HTTP app has the expected routes."""
+        from starlette.testclient import TestClient
 
         from purple_mcp.server import http_app
-        from starlette.testclient import TestClient
 
         test_client = TestClient(http_app)
 
@@ -382,6 +436,7 @@ class TestServerIntegration:
     async def test_concurrent_tool_calls(self, valid_env_config: dict[str, str]) -> None:
         """Test that server can handle concurrent tool calls."""
         import asyncio
+
         from purple_mcp.server import app
 
         # Mock the dependencies to avoid external calls

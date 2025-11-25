@@ -9,7 +9,7 @@ present before the server begins accepting requests.
 import logging
 import uuid
 from functools import lru_cache
-from typing import ClassVar, Final
+from typing import ClassVar, Final, Literal
 from urllib.parse import urlparse
 
 from pydantic import Field, field_validator
@@ -46,6 +46,7 @@ PURPLE_AI_CONSOLE_VERSION_ENV: Final[str] = f"{ENV_PREFIX}PURPLE_AI_CONSOLE_VERS
 ENVIRONMENT_ENV: Final[str] = f"{ENV_PREFIX}ENV"
 LOGFIRE_TOKEN_ENV: Final[str] = f"{ENV_PREFIX}LOGFIRE_TOKEN"
 STATELESS_HTTP_ENV = f"{ENV_PREFIX}STATELESS_HTTP"
+TRANSPORT_MODE_ENV = f"{ENV_PREFIX}TRANSPORT_MODE"
 
 
 class Settings(BaseSettings):
@@ -175,6 +176,12 @@ class Settings(BaseSettings):
         default=False,
         description="Stateless mode (new transport per request)",
         validation_alias=STATELESS_HTTP_ENV,
+    )
+
+    transport_mode: Literal["http", "streamable-http", "sse"] = Field(
+        default="sse",
+        description="Stateless mode (new transport per request)",
+        validation_alias=TRANSPORT_MODE_ENV,
     )
 
     @field_validator("sentinelone_console_base_url")

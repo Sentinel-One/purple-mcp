@@ -54,6 +54,7 @@ class TestApplyEnvironmentOverrides:
     def test_tokens_and_urls_are_set(self) -> None:
         """Test that environment variables are properly set from parameters."""
         cli._apply_environment_overrides(
+            transport_mode="http",
             sdl_api_token="sdl",
             graphql_service_token="graphql",
             console_base_url="https://example.test",
@@ -62,6 +63,7 @@ class TestApplyEnvironmentOverrides:
             stateless_http=True,
         )
 
+        assert os.environ[f"{ENV_PREFIX}TRANSPORT_MODE"] == "http"
         assert os.environ[f"{ENV_PREFIX}SDL_READ_LOGS_TOKEN"] == "sdl"
         assert os.environ[f"{ENV_PREFIX}CONSOLE_TOKEN"] == "graphql"
         assert os.environ[f"{ENV_PREFIX}CONSOLE_BASE_URL"] == "https://example.test"
@@ -75,6 +77,7 @@ class TestApplyEnvironmentOverrides:
         os.environ.pop(f"{ENV_PREFIX}CONSOLE_GRAPHQL_ENDPOINT", None)
 
         cli._apply_environment_overrides(
+            transport_mode=None,
             sdl_api_token=None,
             graphql_service_token=None,
             console_base_url=None,

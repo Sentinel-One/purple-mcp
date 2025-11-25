@@ -71,6 +71,7 @@ def _setup_logging(verbose: bool) -> None:
 
 
 def _apply_environment_overrides(
+    transport_mode: str | None,
     sdl_api_token: str | None,
     graphql_service_token: str | None,
     console_base_url: str | None,
@@ -84,6 +85,7 @@ def _apply_environment_overrides(
     configuration to override environment variable defaults.
 
     Args:
+        transport_mode: MCP transport mode to use.
         sdl_api_token: SDL API authentication token
         graphql_service_token: GraphQL service authentication token
         console_base_url: Base URL for the console
@@ -91,6 +93,8 @@ def _apply_environment_overrides(
         alerts_graphql_endpoint: Alerts GraphQL endpoint path
         stateless_http: Uses true stateless mode (new transport per request)
     """
+    if transport_mode:
+        os.environ[f"{ENV_PREFIX}TRANSPORT_MODE"] = transport_mode
     if sdl_api_token:
         os.environ[f"{ENV_PREFIX}SDL_READ_LOGS_TOKEN"] = sdl_api_token
     if graphql_service_token:
@@ -263,6 +267,7 @@ def _run_uvicorn(
         from purple_mcp.server import app
 
         # Create the HTTP app and instrument it if Logfire is enabled
+        # n.b. stateless_http has no effect if running in "sse" transport mode.
         http_app = app.http_app(transport=transport, stateless_http=stateless_http)
         instrument_starlette_app(http_app)
 
@@ -320,6 +325,7 @@ def _run_mode(
     "-m",
     type=click.Choice(VALID_MODES, case_sensitive=False),
     default="stdio",
+    envvar=f"{ENV_PREFIX}TRANSPORT_MODE",
     help="MCP transport mode to use",
 )
 @click.option(
@@ -381,7 +387,10 @@ def _run_mode(
     "--stateless-http",
     is_flag=True,
     envvar=f"{ENV_PREFIX}STATELESS_HTTP",
-    help="uses true stateless mode (new transport per request)",
+    help=(
+        "Uses true stateless mode (new transport per request). This flag only has an effect if running in"
+        " http or streamable_http modes."
+    ),
 )
 def main(
     mode: str,
@@ -404,6 +413,7 @@ def main(
     _check_unsupported_config()
 
     _apply_environment_overrides(
+        transport_mode=mode,
         sdl_api_token=sdl_api_token,
         graphql_service_token=graphql_service_token,
         console_base_url=console_base_url,
