@@ -2,7 +2,7 @@
 
 This guide will take you through deploying the Purple AI MCP Server to Amazon Bedrock AgentCore. 
 
-> **NOTE:** A valid SentinelOne Singularity account is required to obtain the API tokens needed for authentication.
+> **NOTE:** A SentinelOne account is required to obtain the console token needed for authentication.
 
 ## Prerequisites
 
