@@ -2,6 +2,8 @@
 
 This guide will take you through deploying the Purple AI MCP Server to Amazon Bedrock AgentCore. 
 
+> **NOTE:** A valid SentinelOne Singularity account is required to obtain the API tokens needed for authentication.
+
 ## Prerequisites
 
 **Obtain a Sentinelone Singularity Operations Center console token**
@@ -30,7 +32,7 @@ It is important to note that Purple AI MCP does not include built-in authenticat
 
 When deploying Purple AI MCP via AWS Marketplace a 'default' service role will be automatically created. To use a customer-managed service role reference the IAM Policy below.
 
-[Trust Policy](bedrock-agentcore-trust-policy.json)
+[Trust Policy](bedrock-agentcore-trust-policy.json) \
 [IAM Policy](bedrock-agentcore-iam-policy.json)  
 
 ## Agent Core Configuration Settings
@@ -49,6 +51,33 @@ When configuring the MCP in Bedrock Agent core, set the following.
 8. Click **Host Agent** to complete the setup.
 
 The Agent will take around ~1-2 minutes to become active.
+
+## Example deployment with AWS CLI
+
+```bash
+aws bedrock-agentcore-control create-agent-runtime \
+  --region <region> \
+  --agent-runtime-name "purpleaimcp" \
+  --description "Purple AI MCP Server Agent" \
+  --agent-runtime-artifact '{
+    "containerConfiguration": {
+      "containerUri": "709825985650.dkr.ecr.us-east-1.amazonaws.com/sentinelone/purple-ai-mcp-server:latest"
+    }
+  }' \
+  --role-arn "arn:aws:iam::{{accountId}}:role/your-role-name" \
+  --network-configuration '{
+    "networkMode": "PUBLIC"
+  }' \
+  --protocol-configuration '{
+    "serverProtocol": "MCP"
+  }' \
+  --environment-variables '{
+    "PURPLEMCP_CONSOLE_BASE_URL": "https://your-console.sentinelone.net",
+    "PURPLEMCP_CONSOLE_TOKEN": "your-token",
+    "MCP_MODE": "streamable-http",
+    "PURPLEMCP_STATELESS_HTTP": "True"
+  }'
+```
 
 ## Useful Links
 

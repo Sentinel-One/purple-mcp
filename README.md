@@ -68,6 +68,18 @@ PURPLEMCP_STATELESS_HTTP=True
 ```
 Follow instructions for Amazon Bedrock AgentCore Deployment [here](BEDROCK_AGENTCORE_DEPLOYMENT.md)
 
+### Using Amazon Elastic Container Service (ECS)
+```bash
+# Subscribe to Purple AI MCP Server via AWS Marketplace
+
+#Prepare Environment Variables
+PURPLEMCP_CONSOLE_BASE_URL=https://your-console.sentinelone.net
+PURPLEMCP_CONSOLE_TOKEN=your-token
+MCP_MODE=streamable-http 
+PURPLEMCP_STATELESS_HTTP=True
+```
+Follow instructions for Amazon Elastic Container Service Deployment [here](AMAZON_ECS_DEPLOYMENT.md)
+
 
 For production deployments, see [Deployment Guide](DOCKER.md).
 
