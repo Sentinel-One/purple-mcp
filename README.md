@@ -29,7 +29,8 @@ Purple AI MCP is a read-only service - you cannot make changes to your account o
 
 ```bash
 # Install uv if you don't have it
-curl -LsSf https://astral.sh/uv/install.sh | sh
+brew install uv          # macOS (recommended)
+# Or: curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Set credentials
 export PURPLEMCP_CONSOLE_TOKEN="your_token"
