@@ -7,13 +7,16 @@ injection protection and nested object auto-expansion.
 
 import functools
 import re
+from typing import Final
 
 from pydantic import BaseModel, Field
 
 # Indentation for GraphQL query fields (16 spaces to align with query structure)
-INDENT = " " * 16
+INDENT: Final = " " * 16
 
-_SIMPLE_FIELD_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_SIMPLE_FIELD_PATTERN: Final = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+MAX_CUSTOM_FRAGMENT_DEPTH: Final = 8
+MAX_FRAGMENT_OUTPUT_LENGTH: Final = 8192
 
 
 class GraphQLFieldCatalog(BaseModel):
@@ -87,7 +90,27 @@ class GraphQLFieldCatalog(BaseModel):
     model_config = {"frozen": True}  # Make immutable for safety
 
 
-_FIELD_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_FIELD_NAME_PATTERN: Final = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _max_fragment_depth(fragment: str) -> int:
+    """Calculate the maximum brace nesting depth in a fragment.
+
+    Args:
+        fragment: GraphQL-like fragment string that may contain nested braces.
+
+    Returns:
+        The maximum nesting depth of curly braces found in the fragment.
+    """
+    depth = 0
+    max_depth = 0
+    for char in fragment:
+        if char == "{":
+            depth += 1
+            max_depth = max(max_depth, depth)
+        elif char == "}":
+            depth -= 1
+    return max_depth
 
 
 def _validate_nested_fragment(fragment: str) -> bool:  # noqa: C901
@@ -244,6 +267,7 @@ def _ensure_id_in_fragment(fragment: str) -> str:  # noqa: C901
     current_token = ""
     brace_depth = 0
     i = 0
+    broke_on_root_close = False
 
     while i < len(remaining):
         char = remaining[i]
@@ -258,6 +282,8 @@ def _ensure_id_in_fragment(fragment: str) -> str:  # noqa: C901
             else:
                 if current_token:
                     tokens.append(current_token.strip())
+                    current_token = ""
+                broke_on_root_close = True
                 break
         elif char.isspace() and brace_depth == 0:
             peek_ahead = remaining[i + 1 :].lstrip()
@@ -271,7 +297,7 @@ def _ensure_id_in_fragment(fragment: str) -> str:  # noqa: C901
 
         i += 1
 
-    if current_token and brace_depth == 0:
+    if not broke_on_root_close and current_token and brace_depth == 0:
         tokens.append(current_token.strip())
 
     has_id = False
@@ -289,10 +315,17 @@ def _ensure_id_in_fragment(fragment: str) -> str:  # noqa: C901
     if not has_id and root_field.lower() in objects_with_id:
         processed_tokens.insert(0, "id")
 
-    return f"{root_field} {{ {' '.join(processed_tokens)} }}"
+    result = f"{root_field} {{ {' '.join(processed_tokens)} }}"
+    if len(result) > MAX_FRAGMENT_OUTPUT_LENGTH:
+        raise ValueError(
+            "Nested fragment output is too large after processing. "
+            f"Maximum allowed: {MAX_FRAGMENT_OUTPUT_LENGTH} characters"
+        )
+
+    return result
 
 
-def _validate_field_name(
+def _validate_field_name(  # noqa: C901
     field: str, allowed_fields: set[str], nested_mappings: dict[str, str]
 ) -> None:
     """Validate a single field name against GraphQL injection attacks.
@@ -329,6 +362,13 @@ def _validate_field_name(
             raise ValueError(
                 f"Nested object '{root_field}' is not valid. "
                 f"Valid nested objects are: {sorted(nested_mappings.keys())}"
+            )
+
+        depth = _max_fragment_depth(field)
+        if depth > MAX_CUSTOM_FRAGMENT_DEPTH:
+            raise ValueError(
+                f"Nested field depth {depth} exceeds maximum allowed depth "
+                f"of {MAX_CUSTOM_FRAGMENT_DEPTH}"
             )
 
         return

@@ -5,7 +5,11 @@ Tests the _validate_nested_fragment parser that supports arbitrary nesting depth
 
 import pytest
 
-from purple_mcp.libs.graphql_utils import build_node_fields
+from purple_mcp.libs.graphql_utils import (
+    MAX_CUSTOM_FRAGMENT_DEPTH,
+    _ensure_id_in_fragment,
+    build_node_fields,
+)
 
 
 class TestValidNestedFragments:
@@ -188,3 +192,50 @@ class TestRealWorldNestedFragments:
 
         # id is prepended to asset but NOT to cloudInfo (cloudInfo has no id field)
         assert "asset { id cloudInfo { accountId region } }" in result
+
+
+def _adjacent_closing_braces_fragment(depth: int) -> str:
+    """Build a valid nested fragment without whitespace between closing braces.
+
+    Args:
+        depth: Number of nested `a { ... }` levels inside `asset { ... }`.
+
+    Returns:
+        Fragment string with adjacent closing braces between nested levels.
+    """
+    return "asset{" + ("a{" * depth) + "x" + ("}" * depth) + "}"
+
+
+def test_adjacent_closing_braces_do_not_duplicate_tokens() -> None:
+    """Token parsing should not duplicate nested fragments on root close."""
+    result = _ensure_id_in_fragment("asset{a{x}}")
+    assert result == "asset { id a { x } }"
+
+
+def test_deep_adjacent_closing_braces_remain_bounded() -> None:
+    """Deep nested fragments should remain linear in output size."""
+    result = _ensure_id_in_fragment(_adjacent_closing_braces_fragment(12))
+    assert len(result) < 256
+
+
+def test_custom_fragment_depth_limit_allows_boundary_value() -> None:
+    """Depth exactly at the configured limit should be accepted."""
+    default_fields = ["id", "asset { id name }"]
+    fragment = _adjacent_closing_braces_fragment(MAX_CUSTOM_FRAGMENT_DEPTH - 1)
+    result = build_node_fields(["id", fragment], default_fields)
+    assert "asset { id" in result
+
+
+def test_custom_fragment_depth_limit_rejects_deeper_values() -> None:
+    """Depth over the configured limit should be rejected."""
+    default_fields = ["id", "asset { id name }"]
+    fragment = _adjacent_closing_braces_fragment(MAX_CUSTOM_FRAGMENT_DEPTH)
+    with pytest.raises(ValueError, match="exceeds maximum allowed depth"):
+        build_node_fields(["id", fragment], default_fields)
+
+
+def test_processed_fragment_output_has_hard_cap() -> None:
+    """String building should reject oversized processed fragments."""
+    oversized_fragment = "asset{" + " ".join("x" for _ in range(5000)) + "}"
+    with pytest.raises(ValueError, match="output is too large"):
+        _ensure_id_in_fragment(oversized_fragment)

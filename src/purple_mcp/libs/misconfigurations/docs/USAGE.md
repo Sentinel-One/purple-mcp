@@ -125,7 +125,7 @@ Nested fragments (pass the simple name to receive all subfields):
 - `assignee` &rarr; `id`, `email`, `fullName`
 - `cnapp`, `evidence`, `remediation`, `admissionRequest`, `mitreAttacks`
 
-Custom fragments support arbitrary nesting depth. For example:
+Custom fragments support nested selections up to 8 brace levels. For example:
 ```python
 fields = [
     "id",
