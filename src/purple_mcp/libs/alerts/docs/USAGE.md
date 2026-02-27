@@ -108,10 +108,10 @@ Special scalar field:
 **Note**: You can use either the simple name (e.g., `"asset"`) which auto-expands to all subfields,
 or provide an explicit fragment (e.g., `"asset { id }"`) for precise control.
 
-**Nested Fragments**: Custom fragments support arbitrary nesting depth. You can request deeply nested
-fields like `"asset { cloudInfo { accountId region } }"` or complex structures like
-`"scope { account { id name } site { id name } }"`. All braces must be balanced and field names must
-follow GraphQL identifier rules.
+**Nested Fragments**: Custom fragments support nested selections up to 8 brace levels.
+You can request nested fields like `"asset { cloudInfo { accountId region } }"` or
+complex structures like `"scope { account { id name } site { id name } }"`.
+All braces must be balanced and field names must follow GraphQL identifier rules.
 
 ### Usage Examples
 

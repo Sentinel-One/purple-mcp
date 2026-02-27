@@ -11,6 +11,12 @@ from typing import Final, cast
 
 from purple_mcp.config import get_settings
 from purple_mcp.libs.alerts import AlertsClient, AlertsConfig, FilterInput, ViewType
+from purple_mcp.tools.fields_validation import (
+    MAX_FIELD_LENGTH as _MAX_FIELD_LENGTH,
+    MAX_FIELDS_COUNT as _MAX_FIELDS_COUNT,
+    MAX_FIELDS_JSON_LENGTH as _MAX_FIELDS_JSON_LENGTH,
+    parse_fields_parameter,
+)
 from purple_mcp.type_defs import JsonDict
 
 # TEMPORARY: Using Optional[T] instead of T | None throughout this file for FastMCP compatibility.
@@ -23,6 +29,9 @@ logger = logging.getLogger(__name__)
 # DoS protection constants
 MAX_FILTERS_COUNT: int = 50
 MAX_FILTER_VALUES_COUNT: int = 100
+MAX_FIELDS_COUNT: int = _MAX_FIELDS_COUNT
+MAX_FIELD_LENGTH: int = _MAX_FIELD_LENGTH
+MAX_FIELDS_JSON_LENGTH: int = _MAX_FIELDS_JSON_LENGTH
 
 
 # Docstring constants
@@ -528,23 +537,7 @@ def _parse_fields(fields: str | None) -> list[str] | None:
     Raises:
         ValueError: If fields format is invalid.
     """
-    if fields is None:
-        return None
-
-    try:
-        parsed = json.loads(fields)
-        if not isinstance(parsed, list):
-            raise ValueError("Fields must be an array of field names")
-        # Validate that all elements are strings
-        for i, item in enumerate(parsed):
-            if not isinstance(item, str):
-                raise ValueError(
-                    f"All field names must be strings, but element at index {i} "
-                    f"is {type(item).__name__}: {item!r}"
-                )
-        return parsed
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON in fields parameter: {e}") from e
+    return parse_fields_parameter(fields)
 
 
 async def search_alerts(

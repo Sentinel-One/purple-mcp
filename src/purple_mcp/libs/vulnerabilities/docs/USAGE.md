@@ -121,7 +121,8 @@ Nested fragments:
 - `software` &rarr; Installed software information
 - `assignee` &rarr; `id`, `email`, `fullName`
 
-You can use custom fragments with deeper nesting, e.g. `"cve { id riskScore epssScore }"` or `"asset { cloudInfo { accountId region } }"`.
+Custom fragments support nested selections up to 8 brace levels, e.g.
+`"cve { id riskScore epssScore }"` or `"asset { cloudInfo { accountId region } }"`.
 
 ### Examples
 
