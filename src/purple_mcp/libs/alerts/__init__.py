@@ -10,6 +10,7 @@ from purple_mcp.libs.alerts.exceptions import (
     AlertsSchemaError,
 )
 from purple_mcp.libs.alerts.models import (
+    AIInvestigation,
     Alert,
     AlertConnection,
     AlertEdge,
@@ -52,6 +53,7 @@ from purple_mcp.libs.alerts.models import (
 )
 
 __all__ = [
+    "AIInvestigation",
     "Alert",
     "AlertConnection",
     "AlertEdge",

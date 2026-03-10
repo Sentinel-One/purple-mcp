@@ -13,6 +13,7 @@ from pydantic import JsonValue
 from purple_mcp.libs.alerts.config import AlertsConfig
 from purple_mcp.libs.alerts.exceptions import AlertsClientError, AlertsGraphQLError
 from purple_mcp.libs.alerts.models import (
+    AIInvestigation,
     Alert,
     AlertConnection,
     AlertHistoryConnection,
@@ -200,6 +201,22 @@ query GetAlertHistory($alertId: ID!, $first: Int!, $after: String) {
     }
 }
 """
+)
+
+GET_ALERT_INVESTIGATION_REPORT_QUERY_TEMPLATE = Template(
+    """
+    query GetAlertAIInvestigations($alertIds: [ID!]!) {
+        aiInvestigations(alertIds: $alertIds) {
+            alertId
+            result
+            status
+            verdict
+            timestamp
+            purpleAiStatus
+            investigationStep
+        }
+    }
+    """
 )
 
 
@@ -528,3 +545,31 @@ class AlertsClient(GraphQLClientBase[AlertsClientError, AlertsGraphQLError]):
         data = await self.execute_compatible_query(GET_ALERT_HISTORY_QUERY_TEMPLATE, variables)
 
         return AlertHistoryConnection.model_validate(data["alertHistory"])
+
+    async def get_alert_investigation_report(self, alert_id: str) -> AIInvestigation | None:
+        """Get an agentic investigation report by alert ID.
+
+        The GraphQL query accepts a list of alert IDs and returns a list of
+        investigation objects.  This method queries for a single alert and
+        returns the first matching investigation, or ``None`` when the API
+        returns an empty list.
+
+        Args:
+            alert_id: The unique identifier of the alert.
+
+        Returns:
+            The investigation report if found, None otherwise.
+        """
+        logger.info("Fetching alert investigation report", extra={"alert_id": alert_id})
+
+        variables: JsonDict = {"alertIds": [alert_id]}
+
+        data = await self.execute_compatible_query(
+            GET_ALERT_INVESTIGATION_REPORT_QUERY_TEMPLATE, variables
+        )
+
+        investigations = data.get("aiInvestigations")
+        if not investigations or not isinstance(investigations, list) or len(investigations) == 0:
+            return None
+
+        return AIInvestigation.model_validate(investigations[0])

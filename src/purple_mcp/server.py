@@ -54,11 +54,13 @@ from purple_mcp.observability import initialize_logfire, instrument_starlette_ap
 from purple_mcp.tools.alerts import (
     GET_ALERT_DESCRIPTION,
     GET_ALERT_HISTORY_DESCRIPTION,
+    GET_ALERT_INVESTIGATION_REPORT_DESCRIPTION,
     GET_ALERT_NOTES_DESCRIPTION,
     LIST_ALERTS_DESCRIPTION,
     SEARCH_ALERTS_DESCRIPTION,
     get_alert,
     get_alert_history,
+    get_alert_investigation_report,
     get_alert_notes,
     list_alerts,
     search_alerts,
@@ -119,6 +121,7 @@ app.tool(description=LIST_ALERTS_DESCRIPTION)(list_alerts)
 app.tool(description=SEARCH_ALERTS_DESCRIPTION)(search_alerts)
 app.tool(description=GET_ALERT_NOTES_DESCRIPTION)(get_alert_notes)
 app.tool(description=GET_ALERT_HISTORY_DESCRIPTION)(get_alert_history)
+app.tool(description=GET_ALERT_INVESTIGATION_REPORT_DESCRIPTION)(get_alert_investigation_report)
 app.tool(description=GET_MISCONFIGURATION_DESCRIPTION)(get_misconfiguration)
 app.tool(description=LIST_MISCONFIGURATIONS_DESCRIPTION)(list_misconfigurations)
 app.tool(description=SEARCH_MISCONFIGURATIONS_DESCRIPTION)(search_misconfigurations)
