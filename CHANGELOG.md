@@ -21,6 +21,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Field preset validation with clear error messages for invalid field names
 - `InventoryFetchFieldsPreset` enum in `libs.inventory.field_presets` module
 - Built-in `CVE` and `VT` tools
+- Tool for retrieving Agentic Investigation reports
 
 ### Changed
 
