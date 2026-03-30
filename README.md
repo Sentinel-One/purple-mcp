@@ -44,7 +44,7 @@ uvx --from git+https://github.com/Sentinel-One/purple-mcp.git purple-mcp --mode=
 For production or security-sensitive environments, pin to a specific commit hash
 instead of using the default branch to reduce supply chain risk from the our
 [releases](https://github.com/Sentinel-One/purple-mcp/releases) or our verified
-commits in main branch.
+commits in [main](https://github.com/Sentinel-One/purple-mcp/commits/main) branch.
 
 ```bash
 # Run with pinned hash
