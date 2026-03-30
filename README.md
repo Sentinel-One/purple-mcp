@@ -39,6 +39,18 @@ export PURPLEMCP_CONSOLE_BASE_URL="https://your-console.sentinelone.net"
 uvx --from git+https://github.com/Sentinel-One/purple-mcp.git purple-mcp --mode=stdio
 ```
 
+#### ⚠️ Security note ⚠️
+
+For production or security-sensitive environments, pin to a specific commit hash
+instead of using the default branch to reduce supply chain risk from the our
+[releases](https://github.com/Sentinel-One/purple-mcp/releases) or our verified
+commits in main branch.
+
+```bash
+# Run with pinned hash
+uvx --from git+https://github.com/Sentinel-One/purple-mcp.git@<commit-hash> purple-mcp --mode=stdio
+```
+
 ### Using Docker
 
 ```bash
