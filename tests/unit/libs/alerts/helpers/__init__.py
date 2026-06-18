@@ -6,14 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from purple_mcp.libs.alerts import (
-    Alert,
-    AlertConnection,
-    AlertHistoryConnection,
-    AlertNote,
-    AlertNoteConnection,
-    PageInfo,
-)
+from purple_mcp.libs.alerts import Alert, AlertConnection, AlertNote, PageInfo
 from purple_mcp.type_defs import JsonDict
 
 T = TypeVar("T")

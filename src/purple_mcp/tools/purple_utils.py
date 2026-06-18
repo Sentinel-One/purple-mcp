@@ -21,7 +21,7 @@ Dependencies:
     - datetime: Standard library for datetime parsing and manipulation.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from textwrap import dedent
 from typing import Final
 
@@ -96,7 +96,7 @@ async def iso_to_unix_timestamp(iso_datetime: str) -> str:
 
         # If no timezone info, assume UTC
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
 
         # Convert to UNIX timestamp in milliseconds
         timestamp_ms = int(dt.timestamp() * 1000)

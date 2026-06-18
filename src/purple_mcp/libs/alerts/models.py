@@ -1,11 +1,15 @@
 """Pydantic models for alerts data structures."""
 
-from enum import Enum
+from enum import StrEnum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+_camel_case_model_config = ConfigDict(
+    validate_by_name=False, validate_by_alias=True, serialize_by_alias=True
+)
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     """Alert severity levels."""
 
     CRITICAL = "CRITICAL"
@@ -16,7 +20,7 @@ class Severity(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-class Status(str, Enum):
+class Status(StrEnum):
     """Alert status values."""
 
     NEW = "NEW"
@@ -25,7 +29,7 @@ class Status(str, Enum):
     FALSE_POSITIVE = "FALSE_POSITIVE"
 
 
-class ViewType(str, Enum):
+class ViewType(StrEnum):
     """View type for alert queries."""
 
     ALL = "ALL"
@@ -34,7 +38,7 @@ class ViewType(str, Enum):
     MY_TEAM = "MY_TEAM"
 
 
-class AnalystVerdict(str, Enum):
+class AnalystVerdict(StrEnum):
     """Analyst verdict for alerts."""
 
     FALSE_POSITIVE_BENIGN = "FALSE_POSITIVE_BENIGN"
@@ -65,11 +69,15 @@ class AnalystVerdict(str, Enum):
 class EqualFilterBooleanInput(BaseModel):
     """Strictly matching a boolean value."""
 
+    model_config = _camel_case_model_config
+
     value: bool | None = None
 
 
 class EqualFilterIntegerInput(BaseModel):
     """Strictly matching an integer value."""
+
+    model_config = _camel_case_model_config
 
     value: int | None = None
 
@@ -77,11 +85,15 @@ class EqualFilterIntegerInput(BaseModel):
 class EqualFilterLongInput(BaseModel):
     """Strictly matching a long value."""
 
+    model_config = _camel_case_model_config
+
     value: int | None = None  # Using int for Long in Python
 
 
 class EqualFilterStringInput(BaseModel):
     """Strictly matching a string value."""
+
+    model_config = _camel_case_model_config
 
     value: str | None = None
 
@@ -89,11 +101,15 @@ class EqualFilterStringInput(BaseModel):
 class InFilterBooleanInput(BaseModel):
     """Filter for multiple boolean values."""
 
+    model_config = _camel_case_model_config
+
     values: list[bool] = Field(default_factory=list)
 
 
 class InFilterIntegerInput(BaseModel):
     """Filter for multiple integer values."""
+
+    model_config = _camel_case_model_config
 
     values: list[int] = Field(default_factory=list)
 
@@ -101,17 +117,23 @@ class InFilterIntegerInput(BaseModel):
 class InFilterLongInput(BaseModel):
     """Filter for multiple long values."""
 
+    model_config = _camel_case_model_config
+
     values: list[int] = Field(default_factory=list)  # Using int for Long in Python
 
 
 class InFilterStringInput(BaseModel):
     """Filter for multiple string values."""
 
+    model_config = _camel_case_model_config
+
     values: list[str] = Field(default_factory=list)
 
 
 class RangeFilterIntegerInput(BaseModel):
     """Filter for ranges of integer types."""
+
+    model_config = _camel_case_model_config
 
     start: int | None = None
     start_inclusive: bool = Field(default=True, alias="startInclusive")
@@ -122,6 +144,8 @@ class RangeFilterIntegerInput(BaseModel):
 class RangeFilterLongInput(BaseModel):
     """Filter for ranges of long types."""
 
+    model_config = _camel_case_model_config
+
     start: int | None = None  # Using int for Long in Python
     start_inclusive: bool = Field(default=True, alias="startInclusive")
     end: int | None = None  # Using int for Long in Python
@@ -131,11 +155,15 @@ class RangeFilterLongInput(BaseModel):
 class FulltextFilterInput(BaseModel):
     """Filter for full-text search."""
 
+    model_config = _camel_case_model_config
+
     values: list[str] = Field(default_factory=list)
 
 
 class DetectionSource(BaseModel):
     """Detection source information."""
+
+    model_config = _camel_case_model_config
 
     product: str | None = None
     vendor: str | None = None
@@ -144,6 +172,8 @@ class DetectionSource(BaseModel):
 class Asset(BaseModel):
     """Asset information associated with an alert."""
 
+    model_config = _camel_case_model_config
+
     id: str
     name: str | None = None
     type: str | None = None
@@ -151,6 +181,8 @@ class Asset(BaseModel):
 
 class User(BaseModel):
     """User information for assignees."""
+
+    model_config = _camel_case_model_config
 
     user_id: str | None = Field(None, alias="userId")
     email: str | None = None
@@ -163,6 +195,8 @@ class Alert(BaseModel):
     All fields except 'id' are optional to support dynamic field selection.
     When using custom field selection, only requested fields will be populated.
     """
+
+    model_config = _camel_case_model_config
 
     id: str
     external_id: str | None = Field(None, alias="externalId")
@@ -189,6 +223,8 @@ class Alert(BaseModel):
 class PageInfo(BaseModel):
     """Pagination information for connections."""
 
+    model_config = _camel_case_model_config
+
     has_next_page: bool = Field(alias="hasNextPage")
     has_previous_page: bool = Field(alias="hasPreviousPage")
     start_cursor: str | None = Field(None, alias="startCursor")
@@ -198,12 +234,16 @@ class PageInfo(BaseModel):
 class AlertEdge(BaseModel):
     """Alert edge in a connection."""
 
+    model_config = _camel_case_model_config
+
     node: Alert
     cursor: str
 
 
 class AlertConnection(BaseModel):
     """Paginated connection for alerts."""
+
+    model_config = _camel_case_model_config
 
     edges: list[AlertEdge]
     page_info: PageInfo = Field(alias="pageInfo")
@@ -212,6 +252,8 @@ class AlertConnection(BaseModel):
 
 class AlertNote(BaseModel):
     """Note associated with an alert."""
+
+    model_config = _camel_case_model_config
 
     id: str
     text: str
@@ -223,12 +265,16 @@ class AlertNote(BaseModel):
 class AlertNoteEdge(BaseModel):
     """Alert note edge in a connection."""
 
+    model_config = _camel_case_model_config
+
     node: AlertNote
     cursor: str
 
 
 class AlertNoteConnection(BaseModel):
     """Paginated connection for alert notes."""
+
+    model_config = _camel_case_model_config
 
     edges: list[AlertNoteEdge]
     page_info: PageInfo = Field(alias="pageInfo")
@@ -242,6 +288,8 @@ class UserHistoryItemCreator(BaseModel):
     System-generated events may have null creator or other creator types.
     """
 
+    model_config = _camel_case_model_config
+
     typename: str | None = Field(None, alias="__typename")
     user_id: str | None = Field(None, alias="userId")
     user_type: str | None = Field(None, alias="userType")
@@ -249,6 +297,8 @@ class UserHistoryItemCreator(BaseModel):
 
 class AlertHistoryEvent(BaseModel):
     """Historical event for an alert."""
+
+    model_config = _camel_case_model_config
 
     created_at: str = Field(alias="createdAt")
     event_text: str = Field(alias="eventText")
@@ -279,12 +329,16 @@ class AlertHistoryEvent(BaseModel):
 class AlertHistoryEdge(BaseModel):
     """Alert history edge in a connection."""
 
+    model_config = _camel_case_model_config
+
     node: AlertHistoryEvent
     cursor: str
 
 
 class AlertHistoryConnection(BaseModel):
     """Paginated connection for alert history."""
+
+    model_config = _camel_case_model_config
 
     edges: list[AlertHistoryEdge]
     page_info: PageInfo = Field(alias="pageInfo")
@@ -293,6 +347,8 @@ class AlertHistoryConnection(BaseModel):
 
 class FilterInput(BaseModel):
     """Filter for a field. Only one filter can be defined in the input argument."""
+
+    model_config = _camel_case_model_config
 
     field_id: str = Field(alias="fieldId")
     is_negated: bool = Field(default=False, alias="isNegated")
@@ -523,38 +579,14 @@ class AlertHistoryInput(BaseModel):
 class GetAlertResponse(BaseModel):
     """Response model for get_alert operation."""
 
+    model_config = _camel_case_model_config
+
     alert: Alert | None
-
-
-class ListAlertsResponse(BaseModel):
-    """Response model for list_alerts operation."""
-
-    alerts: AlertConnection
-
-
-class SearchAlertsResponse(BaseModel):
-    """Response model for search_alerts operation."""
-
-    alerts: AlertConnection
 
 
 class GetAlertNotesResponse(BaseModel):
     """Response model for get_alert_notes operation."""
 
+    model_config = _camel_case_model_config
+
     data: list[AlertNote] = Field(default_factory=list)
-
-
-class GetAlertHistoryResponse(BaseModel):
-    """Response model for get_alert_history operation."""
-
-    alert_history: AlertHistoryConnection = Field(alias="alertHistory")
-
-
-# Schema compatibility models
-class SchemaInfo(BaseModel):
-    """Information about schema capabilities."""
-
-    supports_view_type: bool
-    supports_data_sources: bool
-    supports_confidence_level: bool
-    supports_classification: bool

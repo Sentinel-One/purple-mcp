@@ -4,7 +4,7 @@ set -eu
 if [ "${PURPLEMCP_AUTH_TOKEN:-}" = "your-secure-token-here" ]; then
     echo "ERROR: Default placeholder token detected!" >&2
     echo "The PURPLEMCP_AUTH_TOKEN environment variable is set to 'your-secure-token-here'," >&2
-    echo "which is the default placeholder value and must not be used in production." >&2
+    echo "which is the default placeholder value and must not be used in a release environment." >&2
     echo "" >&2
     echo "Please generate a strong random token:" >&2
     echo "  openssl rand -base64 32" >&2
@@ -50,8 +50,8 @@ esac
 
 if [ "$ALLOW_REMOTE_ACCESS" = "true" ]; then
     echo "WARNING: Purple MCP is binding to non-loopback address ($MCP_HOST) without built-in authentication." >&2
-    echo "For production deployments, ensure this service runs behind a reverse proxy or load balancer." >&2
-    echo "See: https://github.com/Sentinel-One/purple-mcp/blob/main/PRODUCTION_SETUP.md" >&2
+    echo "For release environments, ensure this service runs behind a reverse proxy or load balancer." >&2
+    echo "See: https://github.com/Sentinel-One/purple-mcp/blob/main/deploy/cloud/CLOUD_SETUP.md" >&2
     echo "" >&2
 fi
 

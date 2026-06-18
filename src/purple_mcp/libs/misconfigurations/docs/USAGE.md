@@ -2,7 +2,8 @@
 
 Comprehensive usage examples and patterns for the Misconfigurations library.
 
-> **📖 Read-Only Library**: This library provides read-only access to the XSPM Misconfigurations GraphQL API. All examples show data retrieval and analysis operations.
+> **📖 Read-Only Library**: This library provides read-only access to the XSPM Misconfigurations
+> GraphQL API. All examples show data retrieval and analysis operations.
 
 ## Basic Operations
 
@@ -19,7 +20,7 @@ from purple_mcp.libs.misconfigurations import (
 
 async def main() -> None:
     config = MisconfigurationsConfig(
-        graphql_url="https://console.example.com/web/api/v2.1/xspm/findings/misconfigurations/graphql",
+        graphql_url="https://console.sentinelone.net/web/api/v2.1/xspm/findings/misconfigurations/graphql",
         auth_token="your-bearer-token",
     )
 
@@ -63,7 +64,8 @@ async def list_recent_misconfigurations(client: MisconfigurationsClient) -> None
 
 ## Searching with Filters
 
-The library exposes strongly-typed filter helpers. Instantiate `FilterInput` objects using the field you want to query and the appropriate value wrapper.
+The library exposes strongly-typed filter helpers. Instantiate `FilterInput` objects using the
+field you want to query and the appropriate value wrapper.
 
 ```python
 from purple_mcp.libs.misconfigurations.models import (
@@ -114,18 +116,21 @@ Misconfigurations queries support custom field selection so you can reduce paylo
 ### Available Fields
 
 Key scalar fields:
+
 - `id`, `externalId`, `name`, `severity`, `status`, `environment`
 - `detectedAt`, `eventTime`, `lastSeenAt`
 - `product`, `vendor`, `organization`
 - `analystVerdict`, `misconfigurationType`, `mitigable`, `exposureReason`
 
 Nested fragments (pass the simple name to receive all subfields):
+
 - `asset` &rarr; Includes identifiers plus cloud/kubernetes metadata
 - `scope` &rarr; Account, site, and group hierarchy
 - `assignee` &rarr; `id`, `email`, `fullName`
 - `cnapp`, `evidence`, `remediation`, `admissionRequest`, `mitreAttacks`
 
-Custom fragments support nested selections up to 8 brace levels. For example:
+Custom fragments support arbitrary nesting depth. For example:
+
 ```python
 fields = [
     "id",
@@ -157,7 +162,8 @@ connection = await client.search_misconfigurations(
 )
 ```
 
-> **Note:** When you request a subset of fields, unspecified attributes will be `None` in the resulting Pydantic models.
+> **Note:** When you request a subset of fields, unspecified attributes will be `None` in the
+> resulting Pydantic models.
 
 ## Pagination Patterns
 

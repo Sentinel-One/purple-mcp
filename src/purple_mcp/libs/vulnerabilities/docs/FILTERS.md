@@ -4,7 +4,8 @@ Comprehensive guide to the vulnerabilities library filter system.
 
 ## Overview
 
-The vulnerabilities library uses a structured GraphQL filter format with `fieldId` and `filterType` keys. The library includes built-in DoS protection with maximum limits on filter counts and values.
+The vulnerabilities library uses a structured GraphQL filter format with `fieldId` and `filterType`
+keys. The library includes built-in DoS protection with maximum limits on filter counts and values.
 
 ## DoS Protection
 
@@ -35,12 +36,14 @@ results = await client.search_vulnerabilities(filters=filters, first=10)
 ### String Filters
 
 #### String Equality
+
 ```python
 {"fieldId": "severity", "filterType": "string_equals", "value": "CRITICAL"}
 {"fieldId": "status", "filterType": "string_equals", "value": "OPEN"}
 ```
 
 #### String Contains
+
 ```python
 {"fieldId": "cveName", "filterType": "string_contains", "value": "CVE-2024"}
 {"fieldId": "softwareName", "filterType": "string_contains", "value": "Apache"}
@@ -56,6 +59,7 @@ results = await client.search_vulnerabilities(filters=filters, first=10)
 ## Common Filter Patterns
 
 ### By Severity
+
 ```python
 # Critical only
 critical = [{"fieldId": "severity", "filterType": "string_equals", "value": "CRITICAL"}]
@@ -67,6 +71,7 @@ high_critical = [
 ```
 
 ### By Status
+
 ```python
 # Open vulnerabilities
 open_vulns = [{"fieldId": "status", "filterType": "string_equals", "value": "OPEN"}]
@@ -76,6 +81,7 @@ resolved = [{"fieldId": "status", "filterType": "string_equals", "value": "RESOL
 ```
 
 ### By CVE
+
 ```python
 # Specific CVE
 specific_cve = [{"fieldId": "cveName", "filterType": "string_equals", "value": "CVE-2024-1234"}]
@@ -85,6 +91,7 @@ year_2024 = [{"fieldId": "cveName", "filterType": "string_contains", "value": "C
 ```
 
 ### By Exploit Status
+
 ```python
 # Has known exploit
 with_exploit = [
@@ -94,6 +101,7 @@ with_exploit = [
 ```
 
 ### By Asset
+
 ```python
 # Specific asset type
 asset_type = [{"fieldId": "assetType", "filterType": "string_equals", "value": "SERVER"}]
@@ -107,6 +115,7 @@ critical_assets = [
 ## Complex Filter Examples
 
 ### Critical Open Vulnerabilities with Exploits
+
 ```python
 critical_exploitable = [
     {"fieldId": "severity", "filterType": "string_equals", "value": "CRITICAL"},
@@ -116,6 +125,7 @@ critical_exploitable = [
 ```
 
 ### Unpatched High/Critical Vulnerabilities
+
 ```python
 unpatched_high = [
     {"fieldId": "severity", "filterType": "string_in", "values": ["HIGH", "CRITICAL"]},
@@ -129,6 +139,7 @@ unpatched_high = [
 Common filterable fields:
 
 ### Vulnerability Fields
+
 - `severity` - Vulnerability severity (LOW, MEDIUM, HIGH, CRITICAL)
 - `status` - Current status (OPEN, IN_PROGRESS, RESOLVED, DISMISSED)
 - `cveName` - CVE identifier
@@ -136,16 +147,19 @@ Common filterable fields:
 - `isPatchAvailable` - Whether patch is available
 
 ### Asset Fields
+
 - `assetName` - Name of affected asset
 - `assetType` - Type of asset
 - `assetCriticality` - Asset criticality level
 
 ### Software Fields
+
 - `softwareName` - Name of vulnerable software
 - `softwareVersion` - Software version
 - `softwareType` - Type of software (APPLICATION, SYSTEM, LIBRARY)
 
 ### Risk Fields
+
 - `cvssScore` - CVSS base score
 - `exploitMaturity` - Exploit maturity level
 - `remediationLevel` - Remediation availability
@@ -153,6 +167,7 @@ Common filterable fields:
 ## Best Practices
 
 ### 1. Use Specific Filters
+
 ```python
 # ✅ Good
 specific = [
@@ -163,6 +178,7 @@ specific = [
 ```
 
 ### 2. Respect DoS Protection Limits
+
 ```python
 # ✅ Within limits (50 filters max)
 filters = [{"fieldId": f"field{i}", "filterType": "string_equals", "value": "value"} for i in range(50)]
@@ -172,6 +188,7 @@ too_many = [{"fieldId": f"field{i}", "filterType": "string_equals", "value": "va
 ```
 
 ### 3. Combine with Pagination
+
 ```python
 filters = [{"fieldId": "severity", "filterType": "string_equals", "value": "CRITICAL"}]
 all_results = []
@@ -186,6 +203,7 @@ while True:
 ```
 
 ### 4. Handle Filter Errors
+
 ```python
 async def safe_search(client, filters):
     """Safely execute search with error handling."""

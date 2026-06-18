@@ -1,5 +1,8 @@
 """Unit tests for inventory models."""
 
+import json
+
+from purple_mcp.libs.inventory import InventoryFetchFieldsPreset
 from purple_mcp.libs.inventory.models import (
     DeviceReviewLog,
     InventoryItem,
@@ -9,6 +12,28 @@ from purple_mcp.libs.inventory.models import (
     PaginationInfo,
     Surface,
 )
+from purple_mcp.type_defs import JsonDict
+
+
+def load_inventory_item_and_check_round_trip(item_data: JsonDict) -> InventoryItem:
+    """Check that the item as loaded from item_data will round-trip serialization & deserialization as expected."""
+    # serialize
+    item = InventoryItem.model_validate(item_data)
+    item_as_dict = item.model_dump(mode="json", exclude_unset=True)
+    item_as_json = item.model_dump_json_with_field_subset(
+        include_field_names=InventoryItem._map_aliases_to_field_names(
+            InventoryFetchFieldsPreset.ALL.value
+        )
+    )
+
+    item_round_tripped = InventoryItem.model_validate_json(item_as_json)
+
+    # check round trip:
+    assert item_as_dict == item_data
+    assert json.loads(item_as_json) == item_data
+
+    assert item == item_round_tripped
+    return item
 
 
 class TestInventoryItem:
@@ -16,52 +41,52 @@ class TestInventoryItem:
 
     def test_inventory_item_with_boolean_tags(self) -> None:
         """Test that InventoryItem accepts tags with boolean values."""
-        data = {
+        data: JsonDict = {
             "id": "test-123",
             "name": "Test Item",
             "tags": [
                 {
                     "key": "environment",
-                    "value": "production",
+                    "value": "testing",
                     "read_only": True,
                     "reserved": True,
                 }
             ],
         }
 
-        item = InventoryItem.model_validate(data)
+        item = load_inventory_item_and_check_round_trip(data)
         assert item.id == "test-123"
         assert item.name == "Test Item"
         assert item.tags is not None
         assert len(item.tags) == 1
         assert item.tags[0]["key"] == "environment"
-        assert item.tags[0]["value"] == "production"
+        assert item.tags[0]["value"] == "testing"
         assert item.tags[0]["read_only"] is True
         assert item.tags[0]["reserved"] is True
 
     def test_inventory_item_with_string_tags(self) -> None:
         """Test that InventoryItem still accepts tags with all string values."""
-        data = {
+        data: JsonDict = {
             "id": "test-456",
             "name": "Test Item 2",
             "tags": [
                 {
                     "key": "environment",
-                    "value": "staging",
+                    "value": "testing",
                 }
             ],
         }
 
-        item = InventoryItem.model_validate(data)
+        item = load_inventory_item_and_check_round_trip(data)
         assert item.id == "test-456"
         assert item.tags is not None
         assert len(item.tags) == 1
         assert item.tags[0]["key"] == "environment"
-        assert item.tags[0]["value"] == "staging"
+        assert item.tags[0]["value"] == "testing"
 
     def test_inventory_item_with_boolean_cloud_tags(self) -> None:
         """Test that InventoryItem accepts cloud_tags with boolean values."""
-        data = {
+        data: JsonDict = {
             "id": "test-789",
             "name": "Cloud Resource",
             "cloudTags": [
@@ -73,7 +98,7 @@ class TestInventoryItem:
             ],
         }
 
-        item = InventoryItem.model_validate(data)
+        item = load_inventory_item_and_check_round_trip(data)
         assert item.id == "test-789"
         assert item.cloud_tags is not None
         assert len(item.cloud_tags) == 1
@@ -82,23 +107,23 @@ class TestInventoryItem:
 
     def test_inventory_item_minimal(self) -> None:
         """Test InventoryItem with minimal data."""
-        data = {"id": "minimal-123"}
+        data: JsonDict = {"id": "minimal-123"}
 
-        item = InventoryItem.model_validate(data)
+        item = load_inventory_item_and_check_round_trip(data)
         assert item.id == "minimal-123"
         assert item.name is None
         assert item.tags is None
 
     def test_inventory_item_with_alias_fields(self) -> None:
         """Test InventoryItem with camelCase alias fields."""
-        data = {
+        data: JsonDict = {
             "id": "alias-test",
             "idSecondary": ["secondary-1", "secondary-2"],
             "assetContactEmail": "admin@example.com",
             "assetCriticality": "HIGH",
         }
 
-        item = InventoryItem.model_validate(data)
+        item = load_inventory_item_and_check_round_trip(data)
         assert item.id == "alias-test"
         assert item.id_secondary == ["secondary-1", "secondary-2"]
         assert item.asset_contact_email == "admin@example.com"
@@ -115,6 +140,22 @@ class TestInventoryItem:
         # Should not raise ValidationError
         item = InventoryItem.model_validate(data)
         assert item.id == "extra-test"
+
+        # Note that pydantic will serialize extras:
+        round_trip_item = InventoryItem.model_validate_json(
+            item.model_dump_json_with_field_subset(include_field_names=set(data.keys()))
+        )
+        assert round_trip_item == item
+
+        # But typically they're disallowed due to not being in preset ALL list:
+        round_trip_all_fields = InventoryItem.model_validate_json(
+            item.model_dump_json_with_field_subset(
+                include_field_names=InventoryItem._map_aliases_to_field_names(
+                    InventoryFetchFieldsPreset.ALL.value
+                )
+            )
+        )
+        assert round_trip_all_fields != item
 
 
 class TestInventoryNote:
@@ -172,7 +213,7 @@ class TestNetworkInterface:
             "gatewayMac": "00:11:22:33:44:55",
             "ip": "192.168.1.100",
             "mac": "AA:BB:CC:DD:EE:FF",
-            "networkName": "Production Network",
+            "networkName": "Testing Network",
             "subnet": "192.168.1.0/24",
             "name": "eth0",
         }
@@ -182,7 +223,7 @@ class TestNetworkInterface:
         assert interface.gateway_mac == "00:11:22:33:44:55"
         assert interface.ip == "192.168.1.100"
         assert interface.mac == "AA:BB:CC:DD:EE:FF"
-        assert interface.network_name == "Production Network"
+        assert interface.network_name == "Testing Network"
         assert interface.subnet == "192.168.1.0/24"
         assert interface.name == "eth0"
 
@@ -191,9 +232,9 @@ class TestPaginationInfo:
     """Test PaginationInfo model."""
 
     def test_pagination_info_basic(self) -> None:
-        """Test basic PaginationInfo creation."""
+        """Test basic PaginationInfo creation from API response (camelCase)."""
         data = {
-            "total_count": 100,
+            "totalCount": 100,
             "limit": 50,
             "skip": 0,
         }
@@ -211,11 +252,23 @@ class TestInventoryResponse:
         """Test basic InventoryResponse creation."""
         data = {
             "data": [
+                # most basic
                 {"id": "item-1", "name": "Item 1"},
-                {"id": "item-2", "name": "Item 2"},
+                # has camelCase
+                {
+                    "id": "item-2",
+                    "name": "Item 2",
+                    "assetCriticality": "HIGH",  # camelCase
+                },
+                # has nested fields
+                {
+                    "id": "item-3",
+                    "name": "Item 3",
+                    "networkInterfaces": [{"networkName": "foonet"}],
+                },
             ],
             "pagination": {
-                "total_count": 2,
+                "totalCount": 3,
                 "limit": 50,
                 "skip": 0,
             },
@@ -223,12 +276,24 @@ class TestInventoryResponse:
 
         response = InventoryResponse.model_validate(data)
         assert response.data is not None
-        assert len(response.data) == 2
+        assert len(response.data) == 3
         assert response.data[0].id == "item-1"
         assert response.data[1].id == "item-2"
         assert response.pagination is not None
-        assert response.pagination.total_count == 2
+        assert response.pagination.total_count == 3
         assert response.pagination.limit == 50
+
+        # check round trip
+        response_as_json = response.model_dump_json_with_field_subset(
+            include_field_names=InventoryItem._map_aliases_to_field_names(
+                InventoryFetchFieldsPreset.ALL.value
+            )
+        )
+        response_round_tripped = InventoryResponse.model_validate_json(response_as_json)
+
+        # check round trip:
+        assert json.loads(response_as_json) == data
+        assert response == response_round_tripped
 
 
 class TestSurface:
@@ -297,7 +362,7 @@ class TestInventoryItemComplexFields:
 
     def test_inventory_item_with_notes(self) -> None:
         """Test InventoryItem with notes list."""
-        data = {
+        data: JsonDict = {
             "id": "item-with-notes",
             "notes": [
                 {
@@ -315,7 +380,8 @@ class TestInventoryItemComplexFields:
             ],
         }
 
-        item = InventoryItem.model_validate(data)
+        item = load_inventory_item_and_check_round_trip(data)
+
         assert item.notes is not None
         assert len(item.notes) == 2
         assert item.notes[0].id == "note-1"
@@ -324,7 +390,7 @@ class TestInventoryItemComplexFields:
 
     def test_inventory_item_with_device_review_log(self) -> None:
         """Test InventoryItem with device review log."""
-        data = {
+        data: JsonDict = {
             "id": "reviewed-device",
             "deviceReview": "approved",
             "deviceReviewLog": [
@@ -338,7 +404,8 @@ class TestInventoryItemComplexFields:
             ],
         }
 
-        item = InventoryItem.model_validate(data)
+        item = load_inventory_item_and_check_round_trip(data)
+
         assert item.device_review == "approved"
         assert item.device_review_log is not None
         assert len(item.device_review_log) == 1
@@ -347,7 +414,7 @@ class TestInventoryItemComplexFields:
 
     def test_inventory_item_with_network_interfaces(self) -> None:
         """Test InventoryItem with network interfaces list."""
-        data = {
+        data: JsonDict = {
             "id": "server-with-nics",
             "networkInterfaces": [
                 {
@@ -365,7 +432,7 @@ class TestInventoryItemComplexFields:
             ],
         }
 
-        item = InventoryItem.model_validate(data)
+        item = load_inventory_item_and_check_round_trip(data)
         assert item.network_interfaces is not None
         assert len(item.network_interfaces) == 2
         assert item.network_interfaces[0].name == "eth0"
@@ -374,19 +441,19 @@ class TestInventoryItemComplexFields:
 
     def test_inventory_item_cloud_fields(self) -> None:
         """Test InventoryItem with various cloud-specific fields."""
-        data = {
+        data: JsonDict = {
             "id": "cloud-resource",
+            "assetEnvironment": "AWS",
             "cloudProviderAccountId": "123456789",
-            "cloudProviderAccountName": "Production Account",
-            "cloudProvider": "AWS",
+            "cloudProviderAccountName": "Testing Account",
             "region": "us-east-1",
             "cloudResourceId": "i-1234567890abcdef0",
             "cloudResourceArn": "arn:aws:ec2:us-east-1:123456789:instance/i-1234567890abcdef0",
         }
 
-        item = InventoryItem.model_validate(data)
+        item = load_inventory_item_and_check_round_trip(data)
         assert item.cloud_provider_account_id == "123456789"
-        assert item.cloud_provider_account_name == "Production Account"
+        assert item.cloud_provider_account_name == "Testing Account"
         assert item.region == "us-east-1"
         assert item.cloud_resource_id == "i-1234567890abcdef0"
         assert (
@@ -396,7 +463,7 @@ class TestInventoryItemComplexFields:
 
     def test_inventory_item_with_list_fields(self) -> None:
         """Test InventoryItem with various list fields."""
-        data = {
+        data: JsonDict = {
             "id": "item-with-lists",
             "idSecondary": ["secondary-1", "secondary-2"],
             "hostnames": ["host1.example.com", "host2.example.com"],
@@ -407,7 +474,7 @@ class TestInventoryItemComplexFields:
             "riskFactors": ["OUTDATED_OS", "MISSING_PATCHES"],
         }
 
-        item = InventoryItem.model_validate(data)
+        item = load_inventory_item_and_check_round_trip(data)
         assert item.id_secondary == ["secondary-1", "secondary-2"]
         assert item.hostnames == ["host1.example.com", "host2.example.com"]
         assert item.internal_ips == ["10.0.0.1", "10.0.0.2"]
@@ -418,7 +485,7 @@ class TestInventoryItemComplexFields:
 
     def test_inventory_item_with_boolean_fields(self) -> None:
         """Test InventoryItem with various boolean fields."""
-        data = {
+        data: JsonDict = {
             "id": "item-with-booleans",
             "isRogue": True,
             "isPublic": False,
@@ -428,7 +495,7 @@ class TestInventoryItemComplexFields:
             "deleted": False,
         }
 
-        item = InventoryItem.model_validate(data)
+        item = load_inventory_item_and_check_round_trip(data)
         assert item.is_rogue is True
         assert item.is_public is False
         assert item.encryption_enabled is True

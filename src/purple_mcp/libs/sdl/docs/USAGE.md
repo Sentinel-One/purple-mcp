@@ -21,16 +21,16 @@ async def main():
         base_url="https://your-console.sentinelone.net/sdl",
         auth_token="Bearer your-token"
     )
-    
+
     # Create handler
     handler = SDLPowerQueryHandler(
         auth_token=settings.auth_token,
         base_url=settings.base_url,
         settings=settings
     )
-    
+
     # Your SDL operations here
-    
+
 asyncio.run(main())
 ```
 
@@ -41,16 +41,16 @@ asyncio.run(main())
 ```python
 async def execute_simple_query():
     settings = create_sdl_settings(
-        base_url="https://console.example.com/sdl",
+        base_url="https://console.sentinelone.net/sdl",
         auth_token="Bearer your-token"
     )
-    
+
     handler = SDLPowerQueryHandler(
         auth_token=settings.auth_token,
         base_url=settings.base_url,
         settings=settings
     )
-    
+
     try:
         # Submit query for last 24 hours
         await handler.submit_powerquery(
@@ -59,21 +59,21 @@ async def execute_simple_query():
             query="| group count() by event.type | sort -count",
             result_type=SDLPQResultType.TABLE
         )
-        
+
         # Wait for completion and get results
         results = await handler.poll_until_complete()
-        
+
         if not handler.is_result_partial():
             print(f"Query completed successfully!")
             print(f"Matches found: {results.match_count}")
             print(f"Columns: {results.columns}")
-            
+
             # Print results table
             for row in results.values:
                 print(f"  {dict(zip(results.columns, row))}")
         else:
             print("Warning: Results are partial")
-            
+
     except Exception as e:
         print(f"Query failed: {e}")
     finally:
@@ -86,7 +86,7 @@ async def execute_simple_query():
 async def query_with_custom_timeout():
     # Option 1: Configure timeout via SDLSettings
     settings = create_sdl_settings(
-        base_url="https://console.example.com/sdl",
+        base_url="https://console.sentinelone.net/sdl",
         auth_token="Bearer your-token",
         default_poll_timeout_ms=120000,  # 2 minutes default
         default_poll_interval_ms=1000    # Check every second
@@ -132,7 +132,7 @@ async def query_with_table_results():
     """
     # Create SDL settings
     settings = create_sdl_settings(
-        base_url="https://console.example.com/sdl",
+        base_url="https://console.sentinelone.net/sdl",
         auth_token="Bearer your-token"
     )
 
@@ -190,10 +190,10 @@ from purple_mcp.libs.sdl import (
 
 async def use_client_directly():
     settings = create_sdl_settings(
-        base_url="https://console.example.com/sdl",
+        base_url="https://console.sentinelone.net/sdl",
         auth_token="Bearer your-token"
     )
-    
+
     # Use context manager for automatic cleanup
     async with SDLQueryClient(settings.base_url, settings=settings) as client:
         # Submit query
@@ -208,10 +208,10 @@ async def use_client_directly():
             ),
             query_priority=SDLQueryPriority.LOW
         )
-        
+
         query_id = response.id
         print(f"Query submitted: {query_id}")
-        
+
         # Poll for results
         while True:
             ping_response = await client.ping_query(
@@ -219,17 +219,17 @@ async def use_client_directly():
                 query_id=query_id,
                 x_dataset_query_forward_tag=forward_tag
             )
-            
+
             print(f"Progress: {ping_response.steps_completed}/{ping_response.total_steps}")
-            
+
             if ping_response.steps_completed >= ping_response.total_steps:
                 print("Query completed!")
                 print(f"Results: {len(ping_response.results)} items")
-                
+
                 # Process results
                 for result in ping_response.results:
                     print(f"  {result}")
-                
+
                 # Clean up query
                 await client.delete_query(
                     auth_token=settings.auth_token,
@@ -237,7 +237,7 @@ async def use_client_directly():
                     x_dataset_query_forward_tag=forward_tag
                 )
                 break
-            
+
             # Wait before next poll
             await asyncio.sleep(1)
 ```
@@ -247,12 +247,12 @@ async def use_client_directly():
 ```python
 async def manual_client_management():
     settings = create_sdl_settings(
-        base_url="https://console.example.com/sdl",
+        base_url="https://console.sentinelone.net/sdl",
         auth_token="Bearer your-token"
     )
-    
+
     client = SDLQueryClient(settings.base_url, settings=settings)
-    
+
     try:
         # Submit and process query
         response, forward_tag = await client.submit(
@@ -266,9 +266,9 @@ async def manual_client_management():
             ),
             query_priority=SDLQueryPriority.LOW
         )
-        
+
         # Process results...
-        
+
     except Exception as e:
         print(f"Error: {e}")
     finally:
@@ -283,27 +283,27 @@ async def manual_client_management():
 ```python
 async def process_multiple_queries():
     """Execute multiple queries in sequence."""
-    
+
     queries = [
         ("Security Events", "| filter event.category == 'security' | group count() by event.severity"),
         ("Network Traffic", "| filter event.type == 'network' | group count() by event.protocol"),
         ("Process Activity", "| filter event.type == 'process' | group count() by event.action")
     ]
-    
+
     settings = create_sdl_settings(
-        base_url="https://console.example.com/sdl",
+        base_url="https://console.sentinelone.net/sdl",
         auth_token="Bearer your-token"
     )
-    
+
     results = {}
-    
+
     for name, query in queries:
         handler = SDLPowerQueryHandler(
             auth_token=settings.auth_token,
             base_url=settings.base_url,
             settings=settings
         )
-        
+
         try:
             print(f"Executing: {name}")
             await handler.submit_powerquery(
@@ -311,19 +311,19 @@ async def process_multiple_queries():
                 end_time=timedelta(hours=0),
                 query=query
             )
-            
+
             query_results = await handler.poll_until_complete()
             results[name] = query_results
-            
+
             print(f"  Completed: {query_results.match_count} matches")
-            
+
         except Exception as e:
             print(f"  Failed: {e}")
             results[name] = None
-            
+
         finally:
             await handler.close()
-    
+
     return results
 ```
 
@@ -335,7 +335,7 @@ async def query_with_progress():
 
     # Configure poll interval for more frequent progress checks
     settings = create_sdl_settings(
-        base_url="https://console.example.com/sdl",
+        base_url="https://console.sentinelone.net/sdl",
         auth_token="Bearer your-token",
         default_poll_timeout_ms=300000,  # 5 minute timeout
         default_poll_interval_ms=100     # Check every 100ms
@@ -391,40 +391,40 @@ async def query_with_progress():
 ```python
 async def analyze_time_ranges():
     """Analyze data across different time ranges."""
-    
+
     time_ranges = [
         ("Last Hour", timedelta(hours=1)),
         ("Last Day", timedelta(days=1)),
         ("Last Week", timedelta(days=7)),
         ("Last Month", timedelta(days=30))
     ]
-    
+
     query_template = "| filter event.severity == 'HIGH' | group count()"
-    
+
     for name, duration in time_ranges:
         handler = SDLPowerQueryHandler(
             auth_token="Bearer your-token",
-            base_url="https://console.example.com/sdl"
+            base_url="https://console.sentinelone.net/sdl"
         )
-        
+
         try:
             await handler.submit_powerquery(
                 start_time=duration,
                 end_time=timedelta(hours=0),
                 query=query_template
             )
-            
+
             results = await handler.poll_until_complete()
-            
+
             if results.values:
                 count = results.values[0][0]  # First column, first row
                 print(f"{name}: {count} high severity events")
             else:
                 print(f"{name}: No events found")
-                
+
         except Exception as e:
             print(f"{name}: Error - {e}")
-            
+
         finally:
             await handler.close()
 ```
@@ -442,7 +442,7 @@ async def robust_query_execution():
     # Note: Configure timeouts via default_poll_timeout_ms in settings
     try:
         settings = create_sdl_settings(
-            base_url="https://console.example.com/sdl",
+            base_url="https://console.sentinelone.net/sdl",
             auth_token="your-token",
             default_poll_timeout_ms=60000  # 60 second timeout
         )
@@ -505,12 +505,12 @@ async def robust_query_execution():
 ```python
 async def optimized_queries():
     """Examples of optimized SDL queries."""
-    
+
     handler = SDLPowerQueryHandler(
         auth_token="Bearer your-token",
-        base_url="https://console.example.com/sdl"
+        base_url="https://console.sentinelone.net/sdl"
     )
-    
+
     try:
         # ✅ Good: Filter early to reduce data processing
         await handler.submit_powerquery(
@@ -518,15 +518,15 @@ async def optimized_queries():
             end_time=timedelta(hours=0),
             query="| filter event.severity in ('HIGH', 'CRITICAL') | group count() by event.type | limit 10"
         )
-        
+
         results = await handler.poll_until_complete()
         print(f"Optimized query: {results.match_count} results")
-        
+
         # ❌ Avoid: Large time ranges without filtering
         # This would be slow and resource-intensive:
         # query = "| group count() by event.type"  # No filtering
         # start_time = timedelta(days=365)  # Entire year
-        
+
     finally:
         await handler.close()
 ```
@@ -536,29 +536,29 @@ async def optimized_queries():
 ```python
 async def performance_tips():
     """Demonstrate query performance best practices."""
-    
+
     # 1. Use appropriate time ranges
     print("1. Reasonable time ranges:")
     short_range_query = "| filter event.type == 'authentication' | group count() by event.outcome"
-    
+
     # 2. Filter early in the pipeline
     print("2. Early filtering:")
     filtered_query = "| filter event.severity == 'HIGH' | filter event.category == 'security' | group count()"
-    
+
     # 3. Use limits to control result size
     print("3. Limited results:")
     limited_query = "| group count() by event.source.ip | sort -count | limit 20"
-    
+
     # 4. Use TABLE result type (currently the only supported type)
     print("4. Use TABLE result type:")
     # TABLE works for both aggregated and event-level queries
     # The query determines whether you get aggregated or individual event data
-    
+
     handler = SDLPowerQueryHandler(
         auth_token="Bearer your-token",
-        base_url="https://console.example.com/sdl"
+        base_url="https://console.sentinelone.net/sdl"
     )
-    
+
     try:
         # Execute performance-optimized query
         await handler.submit_powerquery(
@@ -567,10 +567,10 @@ async def performance_tips():
             query=filtered_query,  # Pre-filtered
             result_type=SDLPQResultType.TABLE  # Appropriate type
         )
-        
+
         results = await handler.poll_until_complete()
         print(f"Performance query completed: {results.match_count} results")
-        
+
     finally:
         await handler.close()
 ```
@@ -582,24 +582,24 @@ async def performance_tips():
 ```python
 def get_sdl_handler(environment: str):
     """Create SDL handler for specific environment."""
-    
+
     configs = {
         "development": create_sdl_settings(
-            base_url="https://dev-console.example.com/sdl",
+            base_url="https://console.sentinelone.net/sdl",
             auth_token=os.getenv("SDL_DEV_TOKEN"),
             http_timeout=60,
             default_poll_timeout_ms=120000
         ),
-        "production": create_sdl_settings(
-            base_url="https://prod-console.example.com/sdl",
+        "release": create_sdl_settings(
+            base_url="https://console.sentinelone.net/sdl",
             auth_token=os.getenv("SDL_PROD_TOKEN"),
             http_timeout=30,
             default_poll_timeout_ms=60000
         )
     }
-    
+
     settings = configs[environment]
-    
+
     return SDLPowerQueryHandler(
         auth_token=settings.auth_token,
         base_url=settings.base_url,
@@ -611,17 +611,17 @@ async def environment_specific_query():
     # Get handler for current environment
     env = os.getenv("ENVIRONMENT", "development")
     handler = get_sdl_handler(env)
-    
+
     try:
         await handler.submit_powerquery(
             start_time=timedelta(hours=24),
             end_time=timedelta(hours=0),
             query="| group count() by event.type"
         )
-        
+
         results = await handler.poll_until_complete()
         print(f"Environment {env}: {results.match_count} results")
-        
+
     finally:
         await handler.close()
 ```
@@ -635,7 +635,7 @@ from unittest.mock import AsyncMock, patch
 
 async def test_sdl_operations():
     """Example of testing SDL operations."""
-    
+
     # Mock the client responses
     mock_response = Mock()
     mock_response.id = "test-query-id"
@@ -643,27 +643,27 @@ async def test_sdl_operations():
     mock_response.total_steps = 1
     mock_response.results = [{"event_type": "test", "count": 5}]
     mock_response.match_count = 1
-    
+
     with patch('purple_mcp.libs.sdl.SDLQueryClient') as mock_client_class:
         mock_client = AsyncMock()
         mock_client_class.return_value.__aenter__.return_value = mock_client
         mock_client.submit.return_value = (mock_response, "test-forward-tag")
         mock_client.ping_query.return_value = mock_response
-        
+
         # Test the handler
         handler = SDLPowerQueryHandler(
             auth_token="Bearer test-token",
             base_url="https://test.example.com/sdl"
         )
-        
+
         await handler.submit_powerquery(
             start_time=timedelta(hours=1),
             end_time=timedelta(hours=0),
             query="| group count()"
         )
-        
+
         results = await handler.poll_until_complete()
-        
+
         assert results.match_count == 1
         assert len(results.values) == 1
         print("✅ SDL test passed")
@@ -691,35 +691,35 @@ logging.getLogger("purple_mcp.libs.sdl").setLevel(logging.DEBUG)
 ```python
 async def query_with_logging():
     """Execute query with custom logging."""
-    
+
     logger = logging.getLogger("my_app.sdl")
-    
+
     handler = SDLPowerQueryHandler(
         auth_token="Bearer your-token",
-        base_url="https://console.example.com/sdl"
+        base_url="https://console.sentinelone.net/sdl"
     )
-    
+
     try:
         logger.info("Starting SDL query")
-        
+
         await handler.submit_powerquery(
             start_time=timedelta(hours=24),
             end_time=timedelta(hours=0),
             query="| group count() by event.type"
         )
-        
+
         logger.info("Query submitted, waiting for results")
-        
+
         results = await handler.poll_until_complete()
-        
+
         logger.info(f"Query completed: {results.match_count} matches")
-        
+
         return results
-        
+
     except Exception as e:
         logger.error(f"Query failed: {e}")
         raise
-        
+
     finally:
         await handler.close()
 ```

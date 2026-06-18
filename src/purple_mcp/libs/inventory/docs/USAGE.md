@@ -2,18 +2,20 @@
 
 Comprehensive usage examples and patterns for the Inventory Library.
 
-> **📖 Read-Only Library**: This library provides read-only access to the Unified Asset Inventory system. All examples below demonstrate data retrieval and analysis operations.
+> **📖 Read-Only Library**: This library provides read-only access to the Unified Asset Inventory
+> system. All examples below demonstrate data retrieval and analysis operations.
 
 ## Basic Operations
 
 ### Getting Started
+
 ```python
 import asyncio
 from purple_mcp.libs.inventory import InventoryClient, InventoryConfig
 
 async def main():
     config = InventoryConfig(
-        base_url="https://console.example.com",
+        base_url="https://console.sentinelone.net",
         api_endpoint="/web/api/v2.1/xdr/assets",
         api_token="your-bearer-token"
     )
@@ -28,6 +30,7 @@ asyncio.run(main())
 ### Retrieving Inventory Items
 
 #### Get a Specific Item
+
 ```python
 async def get_item_details(client: InventoryClient, item_id: str):
     item = await client.get_inventory_item(item_id)
@@ -41,6 +44,7 @@ async def get_item_details(client: InventoryClient, item_id: str):
 ```
 
 #### List All Inventory Items
+
 ```python
 async def list_all_items(client: InventoryClient):
     response = await client.list_inventory(limit=100, skip=0)
@@ -53,6 +57,7 @@ async def list_all_items(client: InventoryClient):
 ### Surface-Specific Queries
 
 #### Query by Asset Surface
+
 ```python
 from purple_mcp.libs.inventory import Surface
 
@@ -92,6 +97,7 @@ async def list_network_devices(client: InventoryClient):
 ### Searching with Filters
 
 #### Basic Filter Search
+
 ```python
 async def search_windows_servers(client: InventoryClient):
     """Search for Windows Server assets."""
@@ -104,6 +110,7 @@ async def search_windows_servers(client: InventoryClient):
 ```
 
 #### Complex Filter Search
+
 ```python
 async def search_critical_active_servers(client: InventoryClient):
     """Search for critical, active server assets."""
@@ -118,11 +125,12 @@ async def search_critical_active_servers(client: InventoryClient):
 ```
 
 #### Filter with Contains
+
 ```python
-async def search_prod_resources(client: InventoryClient):
-    """Search for resources with 'prod' in the name."""
+async def search_test_resources(client: InventoryClient):
+    """Search for resources with 'test' in the name."""
     filters = {
-        "name__contains": ["prod", "production"]
+        "name__contains": ["test", "testing"]
     }
 
     response = await client.search_inventory(filters=filters, limit=100)
@@ -130,6 +138,7 @@ async def search_prod_resources(client: InventoryClient):
 ```
 
 #### Filter with Date Range
+
 ```python
 async def search_recently_active(client: InventoryClient):
     """Search for recently active assets."""
@@ -145,6 +154,7 @@ async def search_recently_active(client: InventoryClient):
 ```
 
 #### Filter with IN Operator
+
 ```python
 async def search_specific_items(client: InventoryClient, item_ids: list[str]):
     """Search for specific items by ID."""
@@ -159,6 +169,7 @@ async def search_specific_items(client: InventoryClient, item_ids: list[str]):
 ## Pagination Patterns
 
 ### Basic Pagination
+
 ```python
 async def paginate_through_inventory(client: InventoryClient):
     """Retrieve all inventory items using pagination."""
@@ -183,6 +194,7 @@ async def paginate_through_inventory(client: InventoryClient):
 ```
 
 ### Surface-Specific Pagination
+
 ```python
 async def paginate_cloud_resources(client: InventoryClient):
     """Paginate through all cloud resources."""
@@ -209,6 +221,7 @@ async def paginate_cloud_resources(client: InventoryClient):
 ```
 
 ### Filtered Pagination
+
 ```python
 async def paginate_critical_assets(client: InventoryClient):
     """Paginate through all critical assets."""
@@ -241,6 +254,7 @@ async def paginate_critical_assets(client: InventoryClient):
 ## Advanced Patterns
 
 ### Multi-Surface Analysis
+
 ```python
 async def analyze_asset_distribution(client: InventoryClient):
     """Analyze asset distribution across surfaces."""
@@ -260,6 +274,7 @@ async def analyze_asset_distribution(client: InventoryClient):
 ```
 
 ### Criticality Analysis
+
 ```python
 async def analyze_criticality_breakdown(client: InventoryClient):
     """Analyze assets by criticality level."""
@@ -280,6 +295,7 @@ async def analyze_criticality_breakdown(client: InventoryClient):
 ```
 
 ### Cloud Resource Analysis
+
 ```python
 async def analyze_cloud_resources(client: InventoryClient):
     """Detailed analysis of cloud resources."""
@@ -313,6 +329,7 @@ async def analyze_cloud_resources(client: InventoryClient):
 ```
 
 ### Inactive Asset Detection
+
 ```python
 from datetime import datetime, timedelta
 
@@ -355,11 +372,14 @@ async def find_inactive_assets(client: InventoryClient, days_threshold: int = 30
 ## Error Handling Patterns
 
 ### Comprehensive Error Handling
+
+**Note**: The inventory client returns `None` or empty `InventoryResponse` when resources are not
+found, rather than raising exceptions. Always check the return value.
+
 ```python
 from purple_mcp.libs.inventory.exceptions import (
     InventoryAPIError,
     InventoryAuthenticationError,
-    InventoryNotFoundError,
     InventoryNetworkError,
     InventoryTransientError
 )
@@ -367,15 +387,17 @@ from purple_mcp.libs.inventory.exceptions import (
 async def robust_inventory_retrieval(client: InventoryClient, item_id: str):
     try:
         item = await client.get_inventory_item(item_id)
+
+        # Check if item was found
+        if item is None:
+            print(f"Item {item_id} not found")
+            return None
+
         return item
 
     except InventoryAuthenticationError as e:
         print(f"Authentication error: {e}")
         print("Check your API token")
-        return None
-
-    except InventoryNotFoundError as e:
-        print(f"Item not found: {e}")
         return None
 
     except InventoryNetworkError as e:
@@ -393,6 +415,7 @@ async def robust_inventory_retrieval(client: InventoryClient, item_id: str):
 ```
 
 ### Retry with Exponential Backoff
+
 ```python
 import asyncio
 
@@ -406,6 +429,12 @@ async def resilient_inventory_fetch(
     for attempt in range(max_retries):
         try:
             item = await client.get_inventory_item(item_id)
+
+            # Check if item was found (None indicates not found)
+            if item is None:
+                print(f"Item {item_id} not found")
+                return None
+
             return item
 
         except InventoryTransientError as e:
@@ -418,8 +447,8 @@ async def resilient_inventory_fetch(
             print(f"Attempt {attempt + 1} failed, retrying in {delay}s...")
             await asyncio.sleep(delay)
 
-        except (InventoryAuthenticationError, InventoryNotFoundError):
-            # Don't retry these errors
+        except InventoryAuthenticationError:
+            # Don't retry authentication errors
             return None
 
     return None
@@ -428,11 +457,12 @@ async def resilient_inventory_fetch(
 ## Resource Management
 
 ### Context Manager (Recommended)
+
 ```python
 async def use_context_manager():
     """Recommended: Use async context manager for automatic cleanup."""
     config = InventoryConfig(
-        base_url="https://console.example.com",
+        base_url="https://console.sentinelone.net",
         api_endpoint="/web/api/v2.1/xdr/assets",
         api_token="your-token"
     )
@@ -445,11 +475,12 @@ async def use_context_manager():
 ```
 
 ### Manual Resource Management
+
 ```python
 async def manual_resource_management():
     """Manual cleanup when not using context manager."""
     config = InventoryConfig(
-        base_url="https://console.example.com",
+        base_url="https://console.sentinelone.net",
         api_endpoint="/web/api/v2.1/xdr/assets",
         api_token="your-token"
     )
@@ -465,6 +496,7 @@ async def manual_resource_management():
 ## Testing Patterns
 
 ### Mock Testing Setup
+
 ```python
 from unittest.mock import AsyncMock, patch
 

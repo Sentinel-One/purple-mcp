@@ -2,13 +2,16 @@
 
 Complete reference for the Misconfigurations Library API.
 
-> **📖 Read-Only Library**: This library provides read-only access to the XSPM Misconfigurations management system. All methods listed below are for reading and retrieving misconfiguration data. No data modification operations are included in this library.
+> **📖 Read-Only Library**: This library provides read-only access to the XSPM Misconfigurations
+> management system. All methods listed below are for reading and retrieving misconfiguration data.
+> No data modification operations are included in this library.
 
 ## MisconfigurationsClient
 
 Main client class for interacting with the XSPM Misconfigurations GraphQL API.
 
 ### Constructor
+
 ```python
 MisconfigurationsClient(config: MisconfigurationsConfig)
 ```
@@ -16,14 +19,17 @@ MisconfigurationsClient(config: MisconfigurationsConfig)
 ### Misconfiguration Operations
 
 #### `get_misconfiguration(misconfiguration_id: str) -> MisconfigurationDetail | None`
+
 Retrieve a specific misconfiguration by ID.
 
 **Parameters:**
+
 - `misconfiguration_id` (str): Unique identifier for the misconfiguration
 
 **Returns:** MisconfigurationDetail object or None if not found
 
 **Example:**
+
 ```python
 misconfiguration = await client.get_misconfiguration("123")
 if misconfiguration:
@@ -31,19 +37,24 @@ if misconfiguration:
 ```
 
 #### `list_misconfigurations(first: int = 10, after: str | None = None, view_type: str = "ALL", fields: list[str] | None = None) -> MisconfigurationConnection`
+
 List misconfigurations with pagination.
 
 **Parameters:**
+
 - `first` (int): Number of misconfigurations to retrieve (default: 10)
 - `after` (str, optional): Cursor for pagination
 - `view_type` (str): Filter by view type (default: "ALL")
-- `fields` (list[str], optional): List of field names to return. If None, returns all default fields. Use `["id"]` for efficient pagination.
+- `fields` (list[str], optional): List of field names to return. If None, returns all default
+  fields. Use `["id"]` for efficient pagination.
 
 **Returns:** MisconfigurationConnection with paginated results
 
-**Note:** When using custom field selection, only requested fields will be populated in the Misconfiguration model. All non-ID fields are optional to support this feature.
+**Note:** When using custom field selection, only requested fields will be populated in the
+Misconfiguration model. All non-ID fields are optional to support this feature.
 
 **Example:**
+
 ```python
 misconfigurations = await client.list_misconfigurations(first=20)
 print(f"Found {len(misconfigurations.edges)} misconfigurations")
@@ -53,20 +64,26 @@ misconfigurations = await client.list_misconfigurations(first=100, fields=["id"]
 ```
 
 #### `search_misconfigurations(filters: list[FilterInput] | None = None, first: int = 10, after: str | None = None, view_type: str = "ALL", fields: list[str] | None = None) -> MisconfigurationConnection`
+
 Search misconfigurations with filters.
 
 **Parameters:**
-- `filters` (list[FilterInput], optional): Search filters (max 50 filters, max 100 values per filter)
+
+- `filters` (list[FilterInput], optional): Search filters (max 50 filters, max 100 values per
+  filter)
 - `first` (int): Number of misconfigurations to retrieve (default: 10)
 - `after` (str, optional): Cursor for pagination
 - `view_type` (str): Filter by view type (default: "ALL")
-- `fields` (list[str], optional): List of field names to return. If None, returns all default fields.
+- `fields` (list[str], optional): List of field names to return. If None, returns all default
+  fields.
 
 **Returns:** MisconfigurationConnection with filtered results
 
-**Note:** When using custom field selection, only requested fields will be populated in the Misconfiguration model. All non-ID fields are optional to support this feature.
+**Note:** When using custom field selection, only requested fields will be populated in the
+Misconfiguration model. All non-ID fields are optional to support this feature.
 
 **Example:**
+
 ```python
 filters = [
     {"fieldId": "severity", "filterType": "string_equals", "value": "HIGH"},
@@ -78,14 +95,17 @@ results = await client.search_misconfigurations(filters=filters, first=10)
 ### Note Operations
 
 #### `get_misconfiguration_notes(misconfiguration_id: str) -> list[MisconfigurationNote]`
+
 Get notes for a misconfiguration.
 
 **Parameters:**
+
 - `misconfiguration_id` (str): Unique identifier for the misconfiguration
 
 **Returns:** List of MisconfigurationNote objects
 
 **Example:**
+
 ```python
 notes = await client.get_misconfiguration_notes("123")
 for note in notes:
@@ -95,9 +115,11 @@ for note in notes:
 ### History Operations
 
 #### `get_misconfiguration_history(misconfiguration_id: str, first: int = 10, after: str | None = None) -> MisconfigurationHistoryItemConnection`
+
 Get history events for a misconfiguration.
 
 **Parameters:**
+
 - `misconfiguration_id` (str): Unique identifier for the misconfiguration
 - `first` (int): Number of history events to retrieve (default: 10)
 - `after` (str, optional): Cursor for pagination
@@ -105,6 +127,7 @@ Get history events for a misconfiguration.
 **Returns:** MisconfigurationHistoryItemConnection with paginated history
 
 **Example:**
+
 ```python
 history = await client.get_misconfiguration_history("123", first=20)
 for edge in history.edges:
@@ -117,14 +140,16 @@ for edge in history.edges:
 Configuration class for the misconfigurations client.
 
 ### Fields
+
 - `graphql_url: str` - GraphQL endpoint URL for XSPM Misconfigurations
 - `auth_token: str` - Bearer token for authentication
 - `timeout: float = 30.0` - Request timeout in seconds
 
 ### Example
+
 ```python
 config = MisconfigurationsConfig(
-    graphql_url="https://console.example.com/web/api/v2.1/xspm/findings/misconfigurations/graphql",
+    graphql_url="https://console.sentinelone.net/web/api/v2.1/xspm/findings/misconfigurations/graphql",
     auth_token="your-bearer-token",
     timeout=45.0
 )
@@ -133,6 +158,7 @@ config = MisconfigurationsConfig(
 ## Data Models
 
 ### Core Models
+
 - `Misconfiguration` - Main misconfiguration object with all fields
 - `MisconfigurationDetail` - Detailed misconfiguration information
 - `MisconfigurationConnection` - Paginated connection for misconfigurations
@@ -140,6 +166,7 @@ config = MisconfigurationsConfig(
 - `MisconfigurationHistoryItem` - Historical event for a misconfiguration
 
 ### Supporting Models
+
 - `Asset` - Asset information
 - `Account` - Account details
 - `Group` - Group information
@@ -158,6 +185,7 @@ config = MisconfigurationsConfig(
 - `AdmissionRequest` - Admission request details
 
 ### Enums
+
 - `MisconfigurationSeverity` - LOW, MEDIUM, HIGH, CRITICAL
 - `Status` - OPEN, IN_PROGRESS, RESOLVED, DISMISSED
 - `AnalystVerdict` - VALID, INVALID, IN_REVIEW
@@ -169,6 +197,7 @@ config = MisconfigurationsConfig(
 - `AssetScopeLevel` - ACCOUNT, SITE, GROUP, GLOBAL
 
 ### Filter Models
+
 - `FilterInput` - Input filter for searches
 - `EqualFilterStringInput` - String equality filter
 - `EqualFilterIntegerInput` - Integer equality filter
@@ -251,7 +280,9 @@ if page1.page_info.has_next_page:
 ```
 
 ### Pagination Info
+
 The `MisconfigurationConnection` includes:
+
 - `edges: list[MisconfigurationEdge]` - List of misconfiguration edges
 - `page_info: PageInfo` - Pagination metadata including:
   - `has_next_page: bool` - Whether more pages exist

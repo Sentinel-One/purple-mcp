@@ -4,7 +4,8 @@ Comprehensive guide to the alerts library filter system.
 
 ## Overview
 
-The alerts library uses a structured filter format with `fieldId` and `filterType` keys. All filters are created using `FilterInput.create_*` methods to ensure type safety and consistency.
+The alerts library uses a structured filter format with `fieldId` and `filterType` keys. All
+filters are created using `FilterInput.create_*` methods to ensure type safety and consistency.
 
 ## Basic Filter Structure
 
@@ -19,6 +20,7 @@ filter = FilterInput.create_string_equal("severity", "HIGH")
 ### String Filters
 
 #### String Equality
+
 ```python
 # Exact match
 FilterInput.create_string_equal("severity", "HIGH")
@@ -28,17 +30,19 @@ FilterInput.create_string_equal("severity", "HIGH", is_negated=True)
 ```
 
 #### String Multiple Values
+
 ```python
 # IN operation
 FilterInput.create_string_in("severity", ["HIGH", "CRITICAL"])
 
-# NOT IN operation  
+# NOT IN operation
 FilterInput.create_string_in("severity", ["HIGH", "CRITICAL"], is_negated=True)
 ```
 
 ### Integer Filters
 
 #### Integer Equality
+
 ```python
 # Exact match
 FilterInput.create_int_equal("priority", 5)
@@ -48,12 +52,14 @@ FilterInput.create_int_equal("priority", 5, is_negated=True)
 ```
 
 #### Integer Multiple Values
+
 ```python
 # IN operation
 FilterInput.create_int_in("priority", [1, 2, 3])
 ```
 
 #### Integer Ranges
+
 ```python
 # Range (inclusive by default)
 FilterInput.create_int_range("riskScore", start=50, end=100)
@@ -109,6 +115,7 @@ FilterInput.create_fulltext_search("description", ["malware"], is_negated=True)
 ## Complex Filter Examples
 
 ### Multiple Filters (AND Logic)
+
 ```python
 filters = [
     FilterInput.create_string_in("severity", ["HIGH", "CRITICAL"]),
@@ -120,6 +127,7 @@ results = await client.search_alerts(filters=filters, first=20)
 ```
 
 ### Time-Based Filtering
+
 ```python
 from datetime import datetime, timedelta
 
@@ -136,6 +144,7 @@ results = await client.search_alerts(filters=recent_critical_alerts)
 ```
 
 ### Risk Score Filtering
+
 ```python
 # High risk alerts (risk score > 80)
 high_risk_filters = [
@@ -150,6 +159,7 @@ medium_risk_filters = [
 ```
 
 ### Advanced Text Search
+
 ```python
 # Search for specific threats
 threat_filters = [
@@ -167,6 +177,7 @@ excluding_fp = [
 ## Common Filter Patterns
 
 ### Unresolved Critical Alerts
+
 ```python
 unresolved_critical = [
     FilterInput.create_string_equal("severity", "CRITICAL"),
@@ -175,6 +186,7 @@ unresolved_critical = [
 ```
 
 ### Recent Assigned Alerts
+
 ```python
 from datetime import datetime, timedelta
 
@@ -187,6 +199,7 @@ recent_assigned = [
 ```
 
 ### Malware Alerts Pending Review
+
 ```python
 malware_pending = [
     FilterInput.create_fulltext_search("description", ["malware", "virus", "trojan"]),
@@ -200,6 +213,7 @@ malware_pending = [
 Common filterable fields in the alerts system:
 
 ### Alert Fields
+
 - `severity` - Alert severity level (HIGH, CRITICAL, etc.)
 - `status` - Alert status (NEW, IN_PROGRESS, RESOLVED, FALSE_POSITIVE)
 - `analystVerdict` - Analyst assessment (MALICIOUS, SUSPICIOUS, BENIGN, INCONCLUSIVE)
@@ -209,6 +223,7 @@ Common filterable fields in the alerts system:
 - `riskScore` - Integer risk assessment (0-100)
 
 ### Timestamp Fields
+
 - `createdAt` - Alert creation timestamp
 - `detectedAt` - Detection timestamp
 - `updatedAt` - Last update timestamp
@@ -216,6 +231,7 @@ Common filterable fields in the alerts system:
 - `resolvedAt` - Resolution timestamp
 
 ### Text Fields (Full-text Search)
+
 - `description` - Alert description text
 - `name` - Alert name/title
 - `details` - Additional alert details

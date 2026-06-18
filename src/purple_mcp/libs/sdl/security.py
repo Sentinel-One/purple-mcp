@@ -16,12 +16,13 @@ from typing import Final
 logger = logging.getLogger(__name__)
 
 # Security-related constants
-FORBIDDEN_PRODUCTION_ENVIRONMENTS: Final[tuple[str, ...]] = ("production", "prod")
-DEVELOPMENT_ENVIRONMENTS: Final[tuple[str, ...]] = ("development", "dev", "test", "testing")
+RELEASE_ENVIRONMENTS: Final[tuple[str, ...]] = ("release", "production", "prod")
+TESTING_ENVIRONMENTS: Final[tuple[str, ...]] = ("testing", "test", "staging", "stage")
+DEVELOPMENT_ENVIRONMENTS: Final[tuple[str, ...]] = ("development", "dev")
 
 # Standard security messages
 TLS_BYPASS_VALIDATION_ERROR: Final[str] = (
-    "TLS verification bypass is FORBIDDEN in production environments. "
+    "TLS verification bypass is FORBIDDEN in release environments. "
     "This is a critical security risk that could expose sensitive data."
 )
 
@@ -33,7 +34,7 @@ TLS_BYPASS_WARNING_MESSAGE: Final[str] = (
 
 TLS_BYPASS_CRITICAL_LOG: Final[str] = (
     "TLS CERTIFICATE VERIFICATION IS DISABLED! "
-    "This is a CRITICAL SECURITY RISK that should NEVER be used in production. "
+    "This is a CRITICAL SECURITY RISK that should NEVER be used in release environments. "
     "All HTTPS connections are vulnerable to man-in-the-middle attacks."
 )
 
@@ -54,23 +55,42 @@ NON_DEV_ENVIRONMENT_WARNING: Final[str] = (
 )
 
 
-def is_production_environment(environment: str | None = None) -> bool:
-    """Check if the specified environment is production.
+def is_release_environment(environment: str | None = None) -> bool:
+    """Check if the specified environment is a release environment.
 
     Args:
         environment: Environment string to check. If None, reads from PURPLEMCP_ENV
-            environment variable (defaults to "production" if not set).
+            environment variable (defaults to "release" if not set).
 
     Returns:
-        True if the environment is considered production.
+        True if the environment is considered a release environment.
 
     Note:
         For library usage, prefer passing environment explicitly rather than
         relying on the implicit environment variable lookup.
     """
     if environment is None:
-        environment = os.getenv("PURPLEMCP_ENV", "production")
-    return environment.lower() in FORBIDDEN_PRODUCTION_ENVIRONMENTS
+        environment = os.getenv("PURPLEMCP_ENV", "release")
+    return environment.lower() in RELEASE_ENVIRONMENTS
+
+
+def is_testing_environment(environment: str | None = None) -> bool:
+    """Check if the specified environment is testing-like.
+
+    Args:
+        environment: Environment string to check. If None, reads from PURPLEMCP_ENV
+            environment variable (defaults to "release" if not set).
+
+    Returns:
+        True if the environment is considered a testing environment.
+
+    Note:
+        For library usage, prefer passing environment explicitly rather than
+        relying on the implicit environment variable lookup.
+    """
+    if environment is None:
+        environment = os.getenv("PURPLEMCP_ENV", "release")
+    return environment.lower() in TESTING_ENVIRONMENTS
 
 
 def is_development_environment(environment: str | None = None) -> bool:
@@ -78,18 +98,35 @@ def is_development_environment(environment: str | None = None) -> bool:
 
     Args:
         environment: Environment string to check. If None, reads from PURPLEMCP_ENV
-            environment variable (defaults to "production" if not set).
+            environment variable (defaults to "release" if not set).
 
     Returns:
-        True if the environment is considered development/testing.
+        True if the environment is considered a development environment.
 
     Note:
         For library usage, prefer passing environment explicitly rather than
         relying on the implicit environment variable lookup.
     """
     if environment is None:
-        environment = os.getenv("PURPLEMCP_ENV", "production")
+        environment = os.getenv("PURPLEMCP_ENV", "release")
     return environment.lower() in DEVELOPMENT_ENVIRONMENTS
+
+
+def is_non_release_environment(environment: str | None = None) -> bool:
+    """Check if the specified environment is non-release (development or testing).
+
+    Args:
+        environment: Environment string to check. If None, reads from PURPLEMCP_ENV
+            environment variable (defaults to "release" if not set).
+
+    Returns:
+        True if the environment is development or testing (non-release).
+
+    Note:
+        For library usage, prefer passing environment explicitly rather than
+        relying on the implicit environment variable lookup.
+    """
+    return is_development_environment(environment) or is_testing_environment(environment)
 
 
 def validate_tls_bypass_config(skip_tls_verify: bool, environment: str | None = None) -> None:
@@ -101,10 +138,10 @@ def validate_tls_bypass_config(skip_tls_verify: bool, environment: str | None = 
     Args:
         skip_tls_verify: Whether TLS verification bypass is requested.
         environment: The environment string to validate against. If None, reads from
-            PURPLEMCP_ENV environment variable (defaults to "production" if not set).
+            PURPLEMCP_ENV environment variable (defaults to "release" if not set).
 
     Raises:
-        ValueError: If TLS bypass is attempted in production environments.
+        ValueError: If TLS bypass is attempted in release environments.
 
     Note:
         For library usage, prefer passing environment explicitly rather than
@@ -115,10 +152,10 @@ def validate_tls_bypass_config(skip_tls_verify: bool, environment: str | None = 
 
     # Get environment if not provided
     if environment is None:
-        environment = os.getenv("PURPLEMCP_ENV", "production")
+        environment = os.getenv("PURPLEMCP_ENV", "release")
 
-    # Strict production environment protection
-    if is_production_environment(environment):
+    # Strict release environment protection
+    if is_release_environment(environment):
         raise ValueError(TLS_BYPASS_VALIDATION_ERROR)
 
     # Issue strong security warning
@@ -131,7 +168,7 @@ def validate_tls_bypass_config(skip_tls_verify: bool, environment: str | None = 
     # Log critical security warning
     logger.warning(
         "TLS certificate verification is DISABLED - SECURITY RISK! "
-        "This should NEVER be used in production environments."
+        "This should NEVER be used in release environments."
     )
 
     # Log comprehensive security information
@@ -154,10 +191,10 @@ def validate_tls_bypass_client(
         skip_tls_verify: Whether TLS verification bypass is requested.
         target_url: The target URL for the client connection.
         environment: The environment string to validate against. If None, reads from
-            PURPLEMCP_ENV environment variable (defaults to "production" if not set).
+            PURPLEMCP_ENV environment variable (defaults to "release" if not set).
 
     Raises:
-        ValueError: If TLS bypass is attempted in production environments.
+        ValueError: If TLS bypass is attempted in release environments.
 
     Note:
         For library usage, prefer passing environment explicitly rather than
@@ -168,12 +205,12 @@ def validate_tls_bypass_client(
 
     # Get environment if not provided
     if environment is None:
-        environment = os.getenv("PURPLEMCP_ENV", "production")
+        environment = os.getenv("PURPLEMCP_ENV", "release")
 
-    # Runtime production environment protection
-    if is_production_environment(environment):
+    # Runtime release environment protection
+    if is_release_environment(environment):
         raise ValueError(
-            f"SECURITY ERROR: TLS verification bypass is FORBIDDEN in production environments. "
+            f"SECURITY ERROR: TLS verification bypass is FORBIDDEN in release environments. "
             f"Current environment: {environment}. This is a critical security vulnerability."
         )
 
@@ -197,14 +234,14 @@ def log_tls_bypass_initialization(target_url: str, environment: str | None = Non
     Args:
         target_url: The target URL for the HTTP client.
         environment: The environment string for logging context. If None, reads from
-            PURPLEMCP_ENV environment variable (defaults to "production" if not set).
+            PURPLEMCP_ENV environment variable (defaults to "release" if not set).
 
     Note:
         For library usage, prefer passing environment explicitly rather than
         relying on the implicit environment variable lookup.
     """
     if environment is None:
-        environment = os.getenv("PURPLEMCP_ENV", "production")
+        environment = os.getenv("PURPLEMCP_ENV", "release")
 
     logger.critical(
         "Initializing HTTP client with TLS verification DISABLED - vulnerable to man-in-the-middle attacks",
@@ -227,7 +264,7 @@ def get_security_context(environment: str | None = None) -> dict[str, str]:
 
     Args:
         environment: The environment string to generate context for. If None, reads from
-            PURPLEMCP_ENV environment variable (defaults to "production" if not set).
+            PURPLEMCP_ENV environment variable (defaults to "release" if not set).
 
     Returns:
         Dictionary containing security-relevant environment information.
@@ -237,13 +274,14 @@ def get_security_context(environment: str | None = None) -> dict[str, str]:
         relying on the implicit environment variable lookup.
     """
     if environment is None:
-        environment = os.getenv("PURPLEMCP_ENV", "production")
+        environment = os.getenv("PURPLEMCP_ENV", "release")
 
     return {
         "environment": environment,
-        "is_production": str(is_production_environment(environment)).lower(),
+        "is_release": str(is_release_environment(environment)).lower(),
+        "is_testing": str(is_testing_environment(environment)).lower(),
         "is_development": str(is_development_environment(environment)).lower(),
-        "tls_bypass_allowed": str(not is_production_environment(environment)).lower(),
+        "tls_bypass_allowed": str(not is_release_environment(environment)).lower(),
     }
 
 
@@ -255,22 +293,20 @@ def validate_security_configuration(environment: str | None = None) -> None:
 
     Args:
         environment: The environment string to validate. If None, reads from
-            PURPLEMCP_ENV environment variable (defaults to "production" if not set).
+            PURPLEMCP_ENV environment variable (defaults to "release" if not set).
 
     Note:
         For library usage, prefer passing environment explicitly rather than
         relying on the implicit environment variable lookup.
     """
     if environment is None:
-        environment = os.getenv("PURPLEMCP_ENV", "production")
+        environment = os.getenv("PURPLEMCP_ENV", "release")
 
     context = get_security_context(environment)
 
     logger.info("SDL Security Configuration:")
     logger.info("Environment configured", extra={"environment": context["environment"]})
-    logger.info(
-        "Production Environment configured", extra={"is_production": context["is_production"]}
-    )
+    logger.info("Release Environment configured", extra={"is_release": context["is_release"]})
     logger.info(
         "Development Environment configured", extra={"is_development": context["is_development"]}
     )
@@ -279,7 +315,7 @@ def validate_security_configuration(environment: str | None = None) -> None:
         extra={"tls_bypass_allowed": context["tls_bypass_allowed"]},
     )
 
-    if context["is_production"] == "true":
-        logger.info("Production environment detected - TLS bypass is FORBIDDEN")
+    if context["is_release"] == "true":
+        logger.info("Release environment detected - TLS bypass is FORBIDDEN")
     else:
-        logger.warning("Non-production environment - TLS bypass allowed with warnings")
+        logger.warning("Non-release environment - TLS bypass allowed with warnings")

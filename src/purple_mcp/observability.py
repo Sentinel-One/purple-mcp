@@ -52,7 +52,7 @@ def initialize_logfire() -> bool:
         import logfire
 
         # Configure logfire with the token
-        logfire.configure(token=settings.logfire_token)
+        logfire.configure(token=settings.logfire_token, service_name=settings.logfire_service_name)
 
         # Instrument HTTPX for HTTP client tracing
         logfire.instrument_httpx()

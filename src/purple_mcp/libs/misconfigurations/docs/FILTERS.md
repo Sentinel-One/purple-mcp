@@ -4,7 +4,9 @@ Comprehensive guide to the misconfigurations library filter system.
 
 ## Overview
 
-The misconfigurations library uses a structured GraphQL filter format with `fieldId` and `filterType` keys. The library includes built-in DoS protection with maximum limits on filter counts and values.
+The misconfigurations library uses a structured GraphQL filter format with `fieldId` and
+`filterType` keys. The library includes built-in DoS protection with maximum limits on filter
+counts and values.
 
 ## DoS Protection
 
@@ -37,6 +39,7 @@ results = await client.search_misconfigurations(filters=filters, first=10)
 ### String Filters
 
 #### String Equality
+
 ```python
 # Exact match
 {"fieldId": "severity", "filterType": "string_equals", "value": "HIGH"}
@@ -46,6 +49,7 @@ results = await client.search_misconfigurations(filters=filters, first=10)
 ```
 
 #### String Contains (if supported)
+
 ```python
 # Contains text
 {"fieldId": "name", "filterType": "string_contains", "value": "kubernetes"}
@@ -61,12 +65,14 @@ results = await client.search_misconfigurations(filters=filters, first=10)
 ### Integer/Long Filters
 
 #### Integer Equality
+
 ```python
 # Exact match
 {"fieldId": "assetCount", "filterType": "integer_equals", "value": 5}
 ```
 
 #### Integer Range
+
 ```python
 # Range filter
 {"fieldId": "riskScore", "filterType": "integer_range", "min": 50, "max": 100}
@@ -75,6 +81,7 @@ results = await client.search_misconfigurations(filters=filters, first=10)
 ## Complex Filter Examples
 
 ### Critical Open Misconfigurations
+
 ```python
 critical_open = [
     {"fieldId": "severity", "filterType": "string_equals", "value": "CRITICAL"},
@@ -85,6 +92,7 @@ results = await client.search_misconfigurations(filters=critical_open, first=20)
 ```
 
 ### High Severity with Specific Asset Criticality
+
 ```python
 high_severity_critical_assets = [
     {"fieldId": "severity", "filterType": "string_equals", "value": "HIGH"},
@@ -93,6 +101,7 @@ high_severity_critical_assets = [
 ```
 
 ### Compliance-Related Misconfigurations
+
 ```python
 compliance_filters = [
     {"fieldId": "complianceFramework", "filterType": "string_contains", "value": "CIS"},
@@ -103,6 +112,7 @@ compliance_filters = [
 ## Common Filter Patterns
 
 ### By Severity
+
 ```python
 # Critical only
 critical = [{"fieldId": "severity", "filterType": "string_equals", "value": "CRITICAL"}]
@@ -114,6 +124,7 @@ high_or_critical = [
 ```
 
 ### By Status
+
 ```python
 # Open misconfigurations
 open_items = [{"fieldId": "status", "filterType": "string_equals", "value": "OPEN"}]
@@ -126,6 +137,7 @@ resolved = [{"fieldId": "status", "filterType": "string_equals", "value": "RESOL
 ```
 
 ### By Asset Type
+
 ```python
 # Cloud assets
 cloud_assets = [{"fieldId": "assetType", "filterType": "string_equals", "value": "CLOUD"}]
@@ -135,6 +147,7 @@ k8s_resources = [{"fieldId": "assetType", "filterType": "string_contains", "valu
 ```
 
 ### By Policy
+
 ```python
 # Specific policy
 policy_filter = [{"fieldId": "policyName", "filterType": "string_contains", "value": "S3 Bucket"}]
@@ -148,6 +161,7 @@ category_filter = [{"fieldId": "policyCategory", "filterType": "string_equals", 
 Common filterable fields in the misconfigurations system:
 
 ### Misconfiguration Fields
+
 - `severity` - Misconfiguration severity (LOW, MEDIUM, HIGH, CRITICAL)
 - `status` - Current status (OPEN, IN_PROGRESS, RESOLVED, DISMISSED)
 - `analystVerdict` - Analyst assessment (VALID, INVALID, IN_REVIEW)
@@ -156,27 +170,32 @@ Common filterable fields in the misconfigurations system:
 - `policyCategory` - Policy category
 
 ### Asset Fields
+
 - `assetName` - Name of the affected asset
 - `assetType` - Type of asset (Cloud, Endpoint, etc.)
 - `assetCriticality` - Asset criticality level (LOW, MEDIUM, HIGH, CRITICAL)
 - `assetStatus` - Asset status
 
 ### Cloud Fields
+
 - `cloudProvider` - Cloud provider (AWS, Azure, GCP)
 - `cloudRegion` - Cloud region
 - `cloudAccountId` - Cloud account identifier
 - `cloudResourceType` - Type of cloud resource
 
 ### Kubernetes Fields
+
 - `kubernetesCluster` - Cluster name
 - `kubernetesNamespace` - Namespace
 - `kubernetesWorkloadType` - Workload type
 
 ### Compliance Fields
+
 - `complianceFramework` - Compliance framework name (CIS, PCI-DSS, etc.)
 - `complianceStatus` - Compliance status
 
 ### Temporal Fields
+
 - `createdAt` - Misconfiguration creation timestamp
 - `updatedAt` - Last update timestamp
 - `resolvedAt` - Resolution timestamp (if resolved)
@@ -184,6 +203,7 @@ Common filterable fields in the misconfigurations system:
 ## Best Practices
 
 ### 1. Use Specific Filters
+
 ```python
 # ✅ Good - Specific and efficient
 specific = [
@@ -199,6 +219,7 @@ broad = [
 ```
 
 ### 2. Respect DoS Protection Limits
+
 ```python
 # ✅ Within limits
 filters = [
@@ -214,6 +235,7 @@ too_many_filters = [
 ```
 
 ### 3. Combine with Pagination
+
 ```python
 filters = [
     {"fieldId": "severity", "filterType": "string_equals", "value": "HIGH"}
@@ -237,6 +259,7 @@ while True:
 ```
 
 ### 4. Handle Filter Errors
+
 ```python
 from purple_mcp.libs.misconfigurations.exceptions import MisconfigurationsGraphQLError
 
@@ -262,6 +285,7 @@ async def safe_search(client, filters):
 ## Advanced Filtering Patterns
 
 ### Dynamic Filter Building
+
 ```python
 def build_misconfiguration_filters(severity=None, status=None, asset_criticality=None):
     """Dynamically build filters based on parameters."""
@@ -292,6 +316,7 @@ results = await client.search_misconfigurations(filters=filters, first=100)
 ```
 
 ### Progressive Filtering
+
 ```python
 async def progressive_filter(client, initial_filters, additional_criteria):
     """Apply filters progressively for complex queries."""

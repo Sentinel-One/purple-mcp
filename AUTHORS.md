@@ -1,9 +1,9 @@
 # This is the list of Purple MCPs's significant contributors.
-#
-# To see the full list of contributors, see the revision history.
 
 Michael Moore
 Samuel Matos
 Simin Chen
+Stephen Hamer
+Tim Staley
 Timothy Ng
 Tom Kuson

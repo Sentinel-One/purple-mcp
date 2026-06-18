@@ -12,6 +12,10 @@ from purple_mcp.libs.inventory.exceptions import (
     InventoryNotFoundError,
     InventoryTransientError,
 )
+from purple_mcp.libs.inventory.field_presets import (
+    InventoryFetchFieldsPreset,
+    InventoryFetchFieldsPresetName,
+)
 from purple_mcp.libs.inventory.models import (
     InventoryItem,
     InventoryNote,
@@ -27,6 +31,8 @@ __all__ = [
     "InventoryConfig",
     "InventoryConfigError",
     "InventoryError",
+    "InventoryFetchFieldsPreset",
+    "InventoryFetchFieldsPresetName",
     "InventoryItem",
     "InventoryNetworkError",
     "InventoryNotFoundError",

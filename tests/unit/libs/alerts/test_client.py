@@ -1,7 +1,7 @@
 """Unit tests for alerts client."""
 
 from string import Template
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -14,16 +14,19 @@ from purple_mcp.libs.alerts.models import FilterInput, InFilterStringInput, View
 from purple_mcp.type_defs import JsonDict
 
 
+@pytest.fixture
+def config() -> AlertsConfig:
+    """Create test configuration."""
+    return AlertsConfig(
+        graphql_url="https://console.test/graphql",
+        auth_token="test-token",
+        supports_data_sources=True,
+        supports_view_type=True,
+    )
+
+
 class TestExecuteQuery:
     """Test execute_query method."""
-
-    @pytest.fixture
-    def config(self) -> AlertsConfig:
-        """Create test configuration."""
-        return AlertsConfig(
-            graphql_url="https://console.test/graphql",
-            auth_token="test-token",
-        )
 
     @pytest.mark.asyncio
     async def test_successful_query(self, config: AlertsConfig, respx_mock: MockRouter) -> None:
@@ -173,36 +176,28 @@ class TestExecuteQuery:
 class TestSchemaCompatibility:
     """Test schema compatibility features."""
 
-    @pytest.fixture
-    def config(self) -> AlertsConfig:
-        """Create test configuration."""
-        return AlertsConfig(
-            graphql_url="https://console.test/graphql",
-            auth_token="test-token",
-            supports_data_sources=True,
-            supports_view_type=True,
-        )
-
-    def test_is_schema_error(self, config: AlertsConfig) -> None:
+    @pytest.mark.parametrize(
+        ["error", "is_schema_error"],
+        [
+            ("Cannot query field 'dataSources' on type 'Alert'", True),
+            ("Unknown argument 'viewType' on field", True),
+            ("Field does not exist", True),
+            ("Some other error", False),
+        ],
+    )
+    def test_is_schema_error(
+        self, config: AlertsConfig, error: str, is_schema_error: bool
+    ) -> None:
         """Test schema error detection."""
         client = AlertsClient(config)
 
         # Test various schema error messages
-        error1 = AlertsGraphQLError("Cannot query field 'dataSources' on type 'Alert'")
-        assert client._is_schema_error(error1)
-
-        error2 = AlertsGraphQLError("Unknown argument 'viewType' on field")
-        assert client._is_schema_error(error2)
-
-        error3 = AlertsGraphQLError("Field does not exist")
-        assert client._is_schema_error(error3)
-
-        # Test non-schema error
-        error4 = AlertsGraphQLError("Some other error")
-        assert not client._is_schema_error(error4)
+        assert client._is_schema_error(AlertsGraphQLError(error)) is is_schema_error
 
     @pytest.mark.asyncio
-    async def test_non_schema_graphql_error_not_caught(self, config: AlertsConfig) -> None:
+    async def test_non_schema_graphql_error_not_caught(
+        self, config: AlertsConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test that non-schema GraphQL errors are not caught by fallback logic.
 
         The schema compatibility logic should only fall back to a simpler query
@@ -229,28 +224,40 @@ class TestSchemaCompatibility:
         variables: JsonDict = {"id": "alert-123"}
 
         # Mock execute_query to raise a non-schema GraphQL error
-        with (
-            patch.object(
-                client, "execute_query", new=AsyncMock(side_effect=non_schema_error)
-            ) as mock_execute,
-            patch.object(client, "_execute_fallback_query", new=AsyncMock()) as mock_fallback,
-        ):
-            # Attempt to execute the query and expect the original error
-            with pytest.raises(AlertsGraphQLError) as exc_info:
-                await client.execute_compatible_query(query_template, variables, {})
+        mock_execute = AsyncMock(side_effect=non_schema_error)
+        mock_fallback = AsyncMock()
+        monkeypatch.setattr(client, AlertsClient.execute_query.__name__, mock_execute)
+        monkeypatch.setattr(client, AlertsClient._execute_fallback_query.__name__, mock_fallback)
 
-            # Verify the original error is raised
-            assert "Permission Denied" in str(exc_info.value)
-            assert not client._is_schema_error(exc_info.value)
+        # Attempt to execute the query and expect the original error
+        with pytest.raises(AlertsGraphQLError) as exc_info:
+            await client.execute_compatible_query(query_template, variables, {})
 
-            # Verify the fallback method was never called
-            mock_fallback.assert_not_called()
+        # Verify the original error is raised
+        assert "Permission Denied" in str(exc_info.value)
+        assert not client._is_schema_error(exc_info.value)
 
-            # Verify execute_query was called once
-            assert mock_execute.call_count == 1
+        # Verify the fallback method was never called
+        mock_fallback.assert_not_called()
 
+        # Verify execute_query was called once
+        assert mock_execute.call_count == 1
+
+    @pytest.mark.parametrize(
+        "non_schema_error",
+        [
+            "Permission Denied",
+            "Invalid alert ID format",
+            "Authentication failed",
+            "Rate limit exceeded",
+            "Internal server error",
+            "Forbidden",
+        ],
+    )
     @pytest.mark.asyncio
-    async def test_non_schema_error_types(self, config: AlertsConfig) -> None:
+    async def test_non_schema_error_types(
+        self, config: AlertsConfig, non_schema_error: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test various non-schema error types are not caught by fallback.
 
         This test ensures that legitimate application-level errors from the API
@@ -269,34 +276,23 @@ class TestSchemaCompatibility:
             """
         )
 
-        # Test various non-schema error messages
-        non_schema_errors = [
-            "Permission Denied",
-            "Invalid alert ID format",
-            "Authentication failed",
-            "Rate limit exceeded",
-            "Internal server error",
-            "Forbidden",
-        ]
+        mock_execute = AsyncMock(side_effect=AlertsGraphQLError(non_schema_error))
+        mock_fallback = AsyncMock()
+        monkeypatch.setattr(client, AlertsClient.execute_query.__name__, mock_execute)
+        monkeypatch.setattr(client, AlertsClient._execute_fallback_query.__name__, mock_fallback)
 
-        for error_message in non_schema_errors:
-            error = AlertsGraphQLError(error_message)
+        with pytest.raises(AlertsGraphQLError) as exc_info:
+            await client.execute_compatible_query(query_template, {}, {})
 
-            with (
-                patch.object(client, "execute_query", new=AsyncMock(side_effect=error)),
-                patch.object(client, "_execute_fallback_query", new=AsyncMock()) as mock_fallback,
-            ):
-                with pytest.raises(AlertsGraphQLError) as exc_info:
-                    await client.execute_compatible_query(query_template, {}, {})
-
-                # Verify the original error is raised
-                assert error_message in str(exc_info.value)
-
-                # Verify fallback was never called for non-schema errors
-                mock_fallback.assert_not_called()
+        # Verify the original error is raised
+        assert non_schema_error in str(exc_info.value)
+        # Verify fallback was never called for non-schema errors
+        mock_fallback.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_fallback_query_execution(self, config: AlertsConfig) -> None:
+    async def test_fallback_query_execution(
+        self, config: AlertsConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test fallback query execution removes optional fields."""
         client = AlertsClient(config)
         query_template = Template(
@@ -312,14 +308,14 @@ class TestSchemaCompatibility:
 
         variables: JsonDict = {"viewType": "ALL"}
 
-        with patch.object(
-            client, "execute_query", new=AsyncMock(return_value={"alerts": []})
-        ) as mock_execute:
-            await client._execute_fallback_query(query_template, variables, {})
+        mock_execute = AsyncMock(return_value={"alerts": []})
+        monkeypatch.setattr(client, AlertsClient.execute_query.__name__, mock_execute)
 
-            # Verify viewType was removed from variables
-            call_args = mock_execute.call_args
-            assert "viewType" not in call_args[0][1]
+        await client._execute_fallback_query(query_template, variables, {})
+
+        # Verify viewType was removed from variables
+        call_args = mock_execute.call_args
+        assert "viewType" not in call_args[0][1]
 
     def test_query_syntax_with_view_type_disabled(self, config: AlertsConfig) -> None:
         """Test that generated queries are syntactically valid when view_type is disabled.
@@ -401,16 +397,10 @@ class TestSchemaCompatibility:
 class TestGetAlert:
     """Test get_alert method."""
 
-    @pytest.fixture
-    def config(self) -> AlertsConfig:
-        """Create test configuration."""
-        return AlertsConfig(
-            graphql_url="https://console.test/graphql",
-            auth_token="test-token",
-        )
-
     @pytest.mark.asyncio
-    async def test_successful_get(self, config: AlertsConfig) -> None:
+    async def test_successful_get(
+        self, config: AlertsConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test successful alert retrieval."""
         client = AlertsClient(config)
         alert_data: JsonDict = {
@@ -421,24 +411,30 @@ class TestGetAlert:
             "detectedAt": "2024-01-01T00:00:00Z",
         }
 
-        with patch.object(
-            client, "execute_compatible_query", new=AsyncMock(return_value={"alert": alert_data})
-        ):
-            result = await client.get_alert("alert-123")
+        mock_execute_qry = AsyncMock(return_value={"alert": alert_data})
+        monkeypatch.setattr(
+            client, AlertsClient.execute_compatible_query.__name__, mock_execute_qry
+        )
+
+        result = await client.get_alert("alert-123")
 
         assert result is not None
         assert result.id == "alert-123"
         assert result.name == "Test Alert"
 
     @pytest.mark.asyncio
-    async def test_alert_not_found(self, config: AlertsConfig) -> None:
+    async def test_alert_not_found(
+        self, config: AlertsConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test when alert is not found."""
         client = AlertsClient(config)
 
-        with patch.object(
-            client, "execute_compatible_query", new=AsyncMock(return_value={"alert": None})
-        ):
-            result = await client.get_alert("nonexistent")
+        mock_execute_qry = AsyncMock(return_value={"alert": None})
+        monkeypatch.setattr(
+            client, AlertsClient.execute_compatible_query.__name__, mock_execute_qry
+        )
+
+        result = await client.get_alert("nonexistent")
 
         assert result is None
 
@@ -446,16 +442,10 @@ class TestGetAlert:
 class TestListAlerts:
     """Test list_alerts method."""
 
-    @pytest.fixture
-    def config(self) -> AlertsConfig:
-        """Create test configuration."""
-        return AlertsConfig(
-            graphql_url="https://console.test/graphql",
-            auth_token="test-token",
-        )
-
     @pytest.mark.asyncio
-    async def test_successful_list(self, config: AlertsConfig) -> None:
+    async def test_successful_list(
+        self, config: AlertsConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test successful alerts listing."""
         client = AlertsClient(config)
         response_data: JsonDict = {
@@ -482,17 +472,21 @@ class TestListAlerts:
             }
         }
 
-        with patch.object(
-            client, "execute_compatible_query", new=AsyncMock(return_value=response_data)
-        ):
-            result = await client.list_alerts(first=10)
+        mock_execute_qry = AsyncMock(return_value=response_data)
+        monkeypatch.setattr(
+            client, AlertsClient.execute_compatible_query.__name__, mock_execute_qry
+        )
+
+        result = await client.list_alerts(first=10)
 
         assert len(result.edges) == 1
         assert result.edges[0].node.id == "alert-1"
         assert result.total_count == 1
 
     @pytest.mark.asyncio
-    async def test_list_with_view_type(self, config: AlertsConfig) -> None:
+    async def test_list_with_view_type(
+        self, config: AlertsConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test listing with view type filter."""
         config.supports_view_type = True
         client = AlertsClient(config)
@@ -509,29 +503,25 @@ class TestListAlerts:
             }
         }
 
-        with patch.object(
-            client, "execute_compatible_query", new=AsyncMock(return_value=response_data)
-        ) as mock_execute:
-            await client.list_alerts(first=10, view_type=ViewType.ASSIGNED_TO_ME)
+        mock_execute_qry = AsyncMock(return_value=response_data)
+        monkeypatch.setattr(
+            client, AlertsClient.execute_compatible_query.__name__, mock_execute_qry
+        )
 
-            # Verify viewType was passed
-            call_args = mock_execute.call_args
-            assert call_args[0][1]["viewType"] == "ASSIGNED_TO_ME"
+        await client.list_alerts(first=10, view_type=ViewType.ASSIGNED_TO_ME)
+
+        # Verify viewType was passed
+        call_args = mock_execute_qry.call_args
+        assert call_args[0][1]["viewType"] == "ASSIGNED_TO_ME"
 
 
 class TestSearchAlerts:
     """Test search_alerts method."""
 
-    @pytest.fixture
-    def config(self) -> AlertsConfig:
-        """Create test configuration."""
-        return AlertsConfig(
-            graphql_url="https://console.test/graphql",
-            auth_token="test-token",
-        )
-
     @pytest.mark.asyncio
-    async def test_successful_search(self, config: AlertsConfig) -> None:
+    async def test_successful_search(
+        self, config: AlertsConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test successful alert search."""
         client = AlertsClient(config)
         response_data: JsonDict = {
@@ -562,20 +552,24 @@ class TestSearchAlerts:
             FilterInput(fieldId="severity", stringIn=InFilterStringInput(values=["CRITICAL"]))
         ]
 
-        with patch.object(
-            client, "execute_compatible_query", new=AsyncMock(return_value=response_data)
-        ) as mock_execute:
-            result = await client.search_alerts(filters=filters, first=10)
+        mock_execute_qry = AsyncMock(return_value=response_data)
+        monkeypatch.setattr(
+            client, AlertsClient.execute_compatible_query.__name__, mock_execute_qry
+        )
 
-            # Verify filters were serialized
-            call_args = mock_execute.call_args
-            assert "filters" in call_args[0][1]
+        result = await client.search_alerts(filters=filters, first=10)
+
+        # Verify filters were serialized
+        call_args = mock_execute_qry.call_args
+        assert "filters" in call_args[0][1]
 
         assert len(result.edges) == 1
         assert result.edges[0].node.severity == "CRITICAL"
 
     @pytest.mark.asyncio
-    async def test_search_without_filters(self, config: AlertsConfig) -> None:
+    async def test_search_without_filters(
+        self, config: AlertsConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test search without filters."""
         client = AlertsClient(config)
         response_data: JsonDict = {
@@ -591,10 +585,12 @@ class TestSearchAlerts:
             }
         }
 
-        with patch.object(
-            client, "execute_compatible_query", new=AsyncMock(return_value=response_data)
-        ):
-            result = await client.search_alerts(first=10)
+        mock_execute_qry = AsyncMock(return_value=response_data)
+        monkeypatch.setattr(
+            client, AlertsClient.execute_compatible_query.__name__, mock_execute_qry
+        )
+
+        result = await client.search_alerts(first=10)
 
         assert len(result.edges) == 0
 
@@ -602,16 +598,10 @@ class TestSearchAlerts:
 class TestGetAlertNotes:
     """Test get_alert_notes method."""
 
-    @pytest.fixture
-    def config(self) -> AlertsConfig:
-        """Create test configuration."""
-        return AlertsConfig(
-            graphql_url="https://console.test/graphql",
-            auth_token="test-token",
-        )
-
     @pytest.mark.asyncio
-    async def test_successful_get_notes(self, config: AlertsConfig) -> None:
+    async def test_successful_get_notes(
+        self, config: AlertsConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test successful notes retrieval."""
         client = AlertsClient(config)
         response_data: JsonDict = {
@@ -628,8 +618,10 @@ class TestGetAlertNotes:
             }
         }
 
-        with patch.object(client, "execute_query", new=AsyncMock(return_value=response_data)):
-            result = await client.get_alert_notes("alert-123")
+        mock_execute_qry = AsyncMock(return_value=response_data)
+        monkeypatch.setattr(client, AlertsClient.execute_query.__name__, mock_execute_qry)
+
+        result = await client.get_alert_notes("alert-123")
 
         assert len(result.data) == 1
         assert result.data[0].text == "Test note"
@@ -638,16 +630,10 @@ class TestGetAlertNotes:
 class TestGetAlertHistory:
     """Test get_alert_history method."""
 
-    @pytest.fixture
-    def config(self) -> AlertsConfig:
-        """Create test configuration."""
-        return AlertsConfig(
-            graphql_url="https://console.test/graphql",
-            auth_token="test-token",
-        )
-
     @pytest.mark.asyncio
-    async def test_successful_get_history(self, config: AlertsConfig) -> None:
+    async def test_successful_get_history(
+        self, config: AlertsConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test successful history retrieval."""
         client = AlertsClient(config)
         response_data: JsonDict = {
@@ -677,8 +663,10 @@ class TestGetAlertHistory:
             }
         }
 
-        with patch.object(client, "execute_query", new=AsyncMock(return_value=response_data)):
-            result = await client.get_alert_history("alert-123", first=5)
+        mock_execute_qry = AsyncMock(return_value=response_data)
+        monkeypatch.setattr(client, AlertsClient.execute_query.__name__, mock_execute_qry)
+
+        result = await client.get_alert_history("alert-123", first=5)
 
         assert len(result.edges) == 1
         assert result.edges[0].node.event_type == "STATUS_CHANGED"
@@ -689,7 +677,9 @@ class TestGetAlertHistory:
         assert result.page_info.has_next_page is True
 
     @pytest.mark.asyncio
-    async def test_get_history_with_system_event(self, config: AlertsConfig) -> None:
+    async def test_get_history_with_system_event(
+        self, config: AlertsConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test history with system-generated event (no user creator)."""
         client = AlertsClient(config)
         response_data: JsonDict = {
@@ -726,8 +716,10 @@ class TestGetAlertHistory:
             }
         }
 
-        with patch.object(client, "execute_query", new=AsyncMock(return_value=response_data)):
-            result = await client.get_alert_history("alert-123", first=5)
+        mock_execute_qry = AsyncMock(return_value=response_data)
+        monkeypatch.setattr(client, AlertsClient.execute_query.__name__, mock_execute_qry)
+
+        result = await client.get_alert_history("alert-123", first=5)
 
         assert len(result.edges) == 2
         # Both events should have None creator since they're not UserHistoryItemCreator
@@ -735,7 +727,9 @@ class TestGetAlertHistory:
         assert result.edges[1].node.history_item_creator is None
 
     @pytest.mark.asyncio
-    async def test_get_history_with_pagination(self, config: AlertsConfig) -> None:
+    async def test_get_history_with_pagination(
+        self, config: AlertsConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test getting history with pagination."""
         client = AlertsClient(config)
         response_data: JsonDict = {
@@ -751,15 +745,15 @@ class TestGetAlertHistory:
             }
         }
 
-        with patch.object(
-            client, "execute_query", new=AsyncMock(return_value=response_data)
-        ) as mock_execute:
-            result = await client.get_alert_history("alert-123", first=10, after="cursor1")
+        mock_execute_qry = AsyncMock(return_value=response_data)
+        monkeypatch.setattr(client, AlertsClient.execute_query.__name__, mock_execute_qry)
 
-            # Verify pagination parameters
-            call_args = mock_execute.call_args
-            assert call_args[0][1]["first"] == 10
-            assert call_args[0][1]["after"] == "cursor1"
+        result = await client.get_alert_history("alert-123", first=10, after="cursor1")
+
+        # Verify pagination parameters
+        call_args = mock_execute_qry.call_args
+        assert call_args[0][1]["first"] == 10
+        assert call_args[0][1]["after"] == "cursor1"
 
         assert result.page_info.has_previous_page is True
         assert result.total_count == 0

@@ -35,21 +35,22 @@ class TestPurpleAIDirectClient:
         """Create a real Purple AI configuration from environment variables."""
         settings = get_settings()
 
+        # Ensure required credentials are not None for integration tests
+        assert settings.graphql_service_token is not None
+        assert settings.sentinelone_console_base_url is not None
+
         return PurpleAIConfig(
             graphql_url=settings.graphql_full_url,
             auth_token=settings.graphql_service_token,
             user_details=PurpleAIUserDetails(
-                account_id=settings.purple_ai_account_id,
-                team_token=settings.purple_ai_team_token,
                 session_id=settings.purple_ai_session_id,
-                email_address=settings.purple_ai_email_address,
                 user_agent=settings.purple_ai_user_agent,
-                build_date=settings.purple_ai_build_date,
-                build_hash=settings.purple_ai_build_hash,
             ),
             console_details=PurpleAIConsoleDetails(
+                tenant_id=settings.purple_ai_console_tenant_id,
+                account_id=settings.purple_ai_console_account_id,
+                site_id=settings.purple_ai_console_site_id,
                 base_url=settings.sentinelone_console_base_url,
-                version=settings.purple_ai_console_version,
             ),
         )
 
@@ -386,6 +387,14 @@ class TestPurpleAIConfiguration:
     def test_settings_load_from_environment(self, integration_env_check: dict[str, str]) -> None:
         """Test that settings properly load from real environment."""
         settings = get_settings()
+
+        # Ensure credentials are configured (integration tests require them)
+        if settings.sdl_api_token is None:
+            raise RuntimeError("SDL API token not configured for integration tests")
+        if settings.graphql_service_token is None:
+            raise RuntimeError("GraphQL service token not configured for integration tests")
+        if settings.sentinelone_console_base_url is None:
+            raise RuntimeError("Console base URL not configured for integration tests")
 
         # Verify real settings are loaded
         assert settings.sdl_api_token != ""

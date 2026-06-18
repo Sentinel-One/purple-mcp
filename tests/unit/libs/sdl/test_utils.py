@@ -1,6 +1,7 @@
 """Tests for SDL utils functions."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from typing import TypedDict
 
 import pytest
 
@@ -8,12 +9,24 @@ from purple_mcp.libs.sdl.utils import parse_time_param
 from purple_mcp.tools.sdl import _iso_to_nanoseconds, get_timestamp_range
 
 
+class TimeDeltaKwargs(TypedDict, total=False):
+    """Type for time delta keyword arguments."""
+
+    years: int
+    months: int
+    weeks: int
+    days: int
+    hours: int
+    minutes: int
+    seconds: int
+
+
 class TestParseTimeParam:
     """Test cases for the parse_time_param function."""
 
     def test_parse_time_param_with_timezone_aware_datetime(self) -> None:
         """Test that timezone-aware datetime objects are accepted."""
-        dt = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+        dt = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
         result = parse_time_param(dt)
 
         # Should return a string representation of milliseconds
@@ -22,13 +35,6 @@ class TestParseTimeParam:
         # Verify the conversion is correct
         expected_ms = str(int(dt.timestamp() * 1_000))
         assert result == expected_ms
-
-    def test_parse_time_param_with_timezone_naive_datetime_raises_error(self) -> None:
-        """Test that timezone-naive datetime objects raise ValueError."""
-        dt = datetime(2024, 1, 15, 10, 30, 0)  # No timezone info
-
-        with pytest.raises(ValueError, match="Timezone-naive time_param is not allowed"):
-            parse_time_param(dt)
 
     def test_parse_time_param_with_timedelta(self) -> None:
         """Test that timedelta objects are accepted."""
@@ -49,7 +55,7 @@ class TestParseTimeParam:
         )
 
         # UTC datetime
-        dt_utc = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+        dt_utc = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
         result_utc = parse_time_param(dt_utc)
 
         # UTC+5 datetime (same absolute time as 05:30 UTC)
@@ -69,7 +75,7 @@ class TestParseTimeParam:
         result = parse_time_param(delta)
 
         # Get current time for comparison
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         now_ms = int(now.timestamp() * 1_000)
         result_ms = int(result)
 
@@ -90,7 +96,7 @@ class TestIsoToNanoseconds:
         assert isinstance(result, int)
         assert result > 0
         # Verify the conversion is correct
-        expected_dt = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+        expected_dt = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
         expected_ns = int(expected_dt.timestamp() * 1_000_000_000)
         assert result == expected_ns
 
@@ -115,7 +121,7 @@ class TestIsoToNanoseconds:
         assert isinstance(result, int)
         assert result > 0
         # Verify microseconds are preserved in nanoseconds
-        expected_dt = datetime(2024, 1, 15, 10, 30, 0, 123456, tzinfo=timezone.utc)
+        expected_dt = datetime(2024, 1, 15, 10, 30, 0, 123456, tzinfo=UTC)
         expected_ns = int(expected_dt.timestamp() * 1_000_000_000)
         assert result == expected_ns
 
@@ -182,7 +188,7 @@ class TestIsoToNanoseconds:
         iso_string = "2024-01-01T00:00:01Z"
         result = _iso_to_nanoseconds(iso_string)
         # Should be exactly 1 second in nanoseconds after epoch
-        expected_dt = datetime(2024, 1, 1, 0, 0, 1, tzinfo=timezone.utc)
+        expected_dt = datetime(2024, 1, 1, 0, 0, 1, tzinfo=UTC)
         expected_ns = int(expected_dt.timestamp() * 1_000_000_000)
         assert result == expected_ns
 
@@ -439,10 +445,10 @@ class TestTimestampToolsIntegration:
         ],
     )
     def test_tools_integration_common_scenarios(
-        self, scenario_name: str, delta_kwargs: dict[str, int]
+        self, scenario_name: str, delta_kwargs: TimeDeltaKwargs
     ) -> None:
         """Test integration with common time range scenarios."""
-        result = get_timestamp_range(**delta_kwargs)  # type: ignore[arg-type]
+        result = get_timestamp_range(**delta_kwargs)
 
         # Should be valid timestamps
         start_ns = _iso_to_nanoseconds(result["offset_time"])

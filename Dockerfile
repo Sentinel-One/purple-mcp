@@ -1,22 +1,22 @@
 # syntax=docker/dockerfile:1.10
 
-FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim AS builder
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
 
 WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-install-project --no-dev
+    uv sync --locked --no-install-project --no-default-groups
 
 COPY src src
 COPY LICENSE LICENSE
 COPY README.md README.md
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev
+    uv sync --locked --no-default-groups
 
-FROM python:3.14-slim
+FROM python:3.13-slim
 
 LABEL org.opencontainers.image.title="Purple MCP Server"
 LABEL org.opencontainers.image.description="SentinelOne Purple AI MCP Server"

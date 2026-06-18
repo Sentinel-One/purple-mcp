@@ -52,7 +52,7 @@ http {
         listen [::]:443 ssl http2;
         server_name _;
 
-        # SSL/TLS Configuration (replace with production certificates)
+        # SSL/TLS Configuration (replace with release deployment certificates)
         ssl_certificate /etc/nginx/ssl/cert.pem;
         ssl_certificate_key /etc/nginx/ssl/key.pem;
         ssl_protocols TLSv1.2 TLSv1.3;

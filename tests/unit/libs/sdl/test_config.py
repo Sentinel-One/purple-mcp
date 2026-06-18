@@ -11,19 +11,21 @@ class TestCreateSdlSettings:
 
     def test_create_sdl_settings_basic(self) -> None:
         """Test basic settings creation with minimal required fields."""
-        settings = create_sdl_settings(base_url="https://example.test", auth_token="test-token")
+        settings = create_sdl_settings(
+            base_url="https://example.test/sdl", auth_token="test-token"
+        )
 
         assert settings.base_url == "https://example.test/sdl"
         assert settings.auth_token == "Bearer test-token"
         assert settings.http_timeout == 30  # default
 
     def test_create_sdl_settings_url_normalization(self) -> None:
-        """Test URL normalization: trailing slash removal and /sdl path appending."""
+        """Test URL normalization: trailing slash removal."""
         test_cases = [
-            ("https://example.test/", "https://example.test/sdl"),
-            ("https://example.test", "https://example.test/sdl"),
-            ("https://example.test/sdl", "https://example.test/sdl"),
             ("https://example.test/sdl/", "https://example.test/sdl"),
+            ("https://example.test/sdl", "https://example.test/sdl"),
+            ("https://example.test/", "https://example.test"),
+            ("https://example.test", "https://example.test"),
         ]
 
         for input_url, expected_url in test_cases:
@@ -46,7 +48,7 @@ class TestCreateSdlSettings:
     def test_create_sdl_settings_explicit_configuration(self) -> None:
         """Test explicit configuration via create_sdl_settings kwargs."""
         settings = create_sdl_settings(
-            base_url="https://example.test", auth_token="test-token", http_timeout=60
+            base_url="https://example.test/sdl", auth_token="test-token", http_timeout=60
         )
 
         assert settings.base_url == "https://example.test/sdl"
@@ -67,7 +69,9 @@ class TestCreateSdlSettings:
 
     def test_create_sdl_settings_https_url_accepted(self) -> None:
         """Test that HTTPS URLs are accepted."""
-        settings = create_sdl_settings(base_url="https://example.test", auth_token="test-token")
+        settings = create_sdl_settings(
+            base_url="https://example.test/sdl", auth_token="test-token"
+        )
         assert settings.base_url == "https://example.test/sdl"
 
     def test_create_sdl_settings_missing_required_fields(self) -> None:

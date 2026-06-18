@@ -2,7 +2,7 @@
 
 This module provides functionality to build consistent User-Agent headers
 for HTTP requests, including version information for request tracking and
-debugging in production environments.
+debugging in release environments.
 """
 
 import logging

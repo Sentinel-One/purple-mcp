@@ -4,7 +4,8 @@ Comprehensive guide to the inventory library filter system.
 
 ## Overview
 
-The inventory library uses REST API filter format with flexible operators for field filtering. Filters are passed as dictionaries to the `search_inventory` method.
+The inventory library uses REST API filter format with flexible operators for field filtering.
+Filters are passed as dictionaries to the `search_inventory` method.
 
 ## Basic Filter Structure
 
@@ -19,6 +20,7 @@ results = await client.search_inventory(filters=filters, limit=100)
 ## Filter Operators
 
 ### Equality (Default)
+
 Match exact values. Multiple values use OR logic.
 
 ```python
@@ -36,17 +38,19 @@ filters = {
 ```
 
 ### Contains Operator
+
 Search for fields containing specified substrings.
 
 ```python
 # Field contains value
-filters = {"name__contains": ["prod"]}
+filters = {"name__contains": ["test"]}
 
 # Multiple contain values (OR logic)
-filters = {"name__contains": ["prod", "production"]}
+filters = {"name__contains": ["test", "testing"]}
 ```
 
 ### In Operator
+
 Check if field value is in a list.
 
 ```python
@@ -58,6 +62,7 @@ filters = {"resourceType__in": ["Windows Server", "Linux Server", "Database"]}
 ```
 
 ### Between Operator
+
 Date and numeric range filtering.
 
 ```python
@@ -81,6 +86,7 @@ filters = {
 ## Complex Filter Examples
 
 ### Multiple Field Filters (AND Logic)
+
 ```python
 filters = {
     "resourceType": ["Windows Server"],
@@ -92,10 +98,11 @@ results = await client.search_inventory(filters=filters, limit=100)
 ```
 
 ### Text Search with Contains
+
 ```python
-# Find all production resources
+# Find all testing resources
 prod_filters = {
-    "name__contains": ["prod", "production"]
+    "name__contains": ["test", "testing"]
 }
 
 # Find resources by location
@@ -105,6 +112,7 @@ location_filters = {
 ```
 
 ### Date Range Filtering
+
 ```python
 from datetime import datetime, timedelta
 
@@ -121,11 +129,12 @@ recent_active_filters = {
 ```
 
 ### Combining Operators
+
 ```python
 # Complex filter combining multiple operators
 complex_filters = {
     "resourceType": ["Windows Server", "Linux Server"],  # Equality
-    "name__contains": ["prod"],  # Contains
+    "name__contains": ["test"],  # Contains
     "assetStatus": ["Active"],  # Equality
     "lastActiveDt__between": {  # Between
         "from": "2024-01-01T00:00:00Z",
@@ -139,6 +148,7 @@ results = await client.search_inventory(filters=complex_filters, limit=200)
 ## Common Filter Patterns
 
 ### Active Critical Assets
+
 ```python
 active_critical = {
     "assetCriticality": ["Critical"],
@@ -147,6 +157,7 @@ active_critical = {
 ```
 
 ### Cloud Resources by Type
+
 ```python
 cloud_databases = {
     "resourceType": ["RDS", "DynamoDB", "Aurora", "Redshift"]
@@ -154,6 +165,7 @@ cloud_databases = {
 ```
 
 ### Recently Active Servers
+
 ```python
 from datetime import datetime, timedelta
 
@@ -169,15 +181,17 @@ recent_servers = {
 }
 ```
 
-### Production Resources
+### Testing Resources
+
 ```python
-production_filters = {
-    "name__contains": ["prod", "production"],
+testing_filters = {
+    "name__contains": ["test", "testing"],
     "assetStatus": ["Active"]
 }
 ```
 
 ### Specific Asset Types
+
 ```python
 endpoints_filters = {
     "resourceType": ["Desktop", "Laptop", "Server"]
@@ -197,29 +211,35 @@ identity_filters = {
 Common filterable fields in the inventory system:
 
 ### Asset Identification
+
 - `id` - Unique asset identifier
 - `name` - Asset name/hostname
 - `resourceType` - Type of resource (Server, Desktop, EC2, etc.)
 
 ### Asset Status
+
 - `assetStatus` - Current status (Active, Inactive, etc.)
 - `assetCriticality` - Criticality level (Critical, High, Medium, Low)
 
 ### Temporal Fields
+
 - `lastActiveDt` - Last activity timestamp
 - `createdAt` - Asset creation/discovery timestamp (if available)
 - `updatedAt` - Last update timestamp (if available)
 
 ### Cloud-Specific (when applicable)
+
 - `cloudProvider` - Cloud provider name (AWS, Azure, GCP)
 - `cloudRegion` - Cloud region
 - `cloudAccountId` - Cloud account identifier
 
 ### Network-Specific (when applicable)
+
 - `ipAddress` - IP address
 - `macAddress` - MAC address
 
 ### Kubernetes-Specific (when applicable)
+
 - `kubernetesCluster` - Cluster name
 - `kubernetesNamespace` - Namespace
 - `kubernetesWorkloadType` - Workload type (Pod, Deployment, etc.)
@@ -227,6 +247,7 @@ Common filterable fields in the inventory system:
 ## Surface-Specific Filtering
 
 ### Endpoint Surface
+
 ```python
 # Use list_inventory with surface parameter
 from purple_mcp.libs.inventory import Surface
@@ -243,6 +264,7 @@ endpoint_search = await client.search_inventory(filters=endpoint_filters, limit=
 ```
 
 ### Cloud Surface
+
 ```python
 # Cloud-specific filters
 cloud_filters = {
@@ -254,6 +276,7 @@ cloud_response = await client.search_inventory(filters=cloud_filters, limit=100)
 ```
 
 ### Identity Surface
+
 ```python
 # Identity-specific filters
 identity_filters = {
@@ -267,6 +290,7 @@ identity_response = await client.search_inventory(filters=identity_filters, limi
 ## Filter Best Practices
 
 ### 1. Use Specific Filters
+
 ```python
 # ✅ Good - Specific and efficient
 specific_filters = {
@@ -282,6 +306,7 @@ broad_filters = {
 ```
 
 ### 2. Combine with Pagination
+
 ```python
 # Always use pagination for large result sets
 filters = {
@@ -308,6 +333,7 @@ while True:
 ```
 
 ### 3. Date Range Best Practices
+
 ```python
 from datetime import datetime, timedelta
 
@@ -330,6 +356,7 @@ all_time_filters = {
 ```
 
 ### 4. Use Surface Parameter When Possible
+
 ```python
 # ✅ Better - Use surface parameter for surface-specific queries
 endpoint_response = await client.list_inventory(surface=Surface.ENDPOINT, limit=100)
@@ -362,6 +389,7 @@ async def safe_filtered_search(client, filters):
 ## Advanced Filtering Patterns
 
 ### Progressive Filtering
+
 ```python
 async def progressive_filter(client, initial_filters, additional_filters):
     """Apply filters progressively for complex queries."""
@@ -382,6 +410,7 @@ async def progressive_filter(client, initial_filters, additional_filters):
 ```
 
 ### Dynamic Filter Building
+
 ```python
 def build_filters(resource_types=None, status=None, criticality=None, date_range=None):
     """Dynamically build filters based on parameters."""

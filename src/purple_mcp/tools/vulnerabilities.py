@@ -9,7 +9,7 @@ import logging
 from textwrap import dedent
 from typing import Final
 
-from purple_mcp.config import get_settings
+from purple_mcp.config import get_settings, validate_request_credentials
 from purple_mcp.libs.vulnerabilities import (
     FilterInput,
     VulnerabilitiesClient,
@@ -273,7 +273,7 @@ SEARCH_VULNERABILITIES_DESCRIPTION: Final[str] = dedent(
                 - "fulltext": Single-value text search. Requires "values" key (list of search terms).
                   Example: {"fieldId": "name", "filterType": "fulltext", "values": ["log4j"]}
                 - "fulltext_in": Multi-value text search with partial matching. Requires "values" key (list).
-                  Example: {"fieldId": "assetName", "filterType": "fulltext_in", "values": ["server", "prod", "web"]}
+                  Example: {"fieldId": "assetName", "filterType": "fulltext_in", "values": ["server", "test", "web"]}
 
                 Limits:
                 - Maximum 50 filters per request
@@ -318,7 +318,7 @@ SEARCH_VULNERABILITIES_DESCRIPTION: Final[str] = dedent(
         ]
         WRONG: filters=[
           {"fieldId": "cve.id", "filterType": "string_equals", "value": "CVE-2024-1234"},  # Use "cveId" not "cve.id"
-          {"fieldId": "asset.name", "filterType": "fulltext", "values": ["prod"]},  # Use "assetName" not "asset.name"
+          {"fieldId": "asset.name", "filterType": "fulltext", "values": ["test"]},  # Use "assetName" not "asset.name"
           {"fieldId": "severity", "filterType": "EQUALS", "value": "CRITICAL"}  # Use "string_equals" not "EQUALS"
         ]
     """
@@ -445,6 +445,12 @@ def _get_vulnerabilities_client() -> VulnerabilitiesClient:
             f"Settings not initialized. Please check your environment configuration. Error: {e}"
         ) from e
 
+    # Validate credentials are available (vulnerabilities only needs token, not base URL)
+    validate_request_credentials(settings, require_base_url=False)
+
+    # After validation, token is guaranteed to be non-None
+    assert settings.graphql_service_token is not None
+
     config = VulnerabilitiesConfig(
         graphql_url=settings.vulnerabilities_graphql_url,
         auth_token=settings.graphql_service_token,
@@ -564,7 +570,7 @@ def _parse_fields(fields: str | None) -> list[str] | None:
         Parsed list of field names, or None if no fields specified.
 
     Raises:
-        ValueError: If fields format is invalid.
+        ValueError: If fields format is invalid or exceeds configured limits.
     """
     return parse_fields_parameter(fields)
 

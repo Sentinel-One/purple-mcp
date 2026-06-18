@@ -8,9 +8,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from purple_mcp.libs.sdl import SDLHandler, SDLSettings, create_sdl_settings
+from purple_mcp.libs.sdl.config import SDLSettings, create_sdl_settings
 from purple_mcp.libs.sdl.models import SDLPingResponse, SDLQueryResult, SDLTableResultData
 from purple_mcp.libs.sdl.sdl_exceptions import SDLHandlerError
+from purple_mcp.libs.sdl.sdl_query_handler import SDLHandler
 
 
 class FakeClock:
@@ -583,7 +584,7 @@ class TestSDLHandlerExceptionChaining:
     async def test_exception_traceback_preservation(self, handler: ConcreteSDLHandler) -> None:
         """Test that the original exception's traceback is preserved.
 
-        This is crucial for debugging production issues, as it allows
+        This is crucial for debugging release environment issues, as it allows
         developers to see where the original error occurred.
         """
 

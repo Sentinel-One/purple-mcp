@@ -4,13 +4,15 @@ These tests verify that the retry policy correctly interprets http_max_retries
 as the number of retries (not attempts), and handles edge cases like zero retries.
 """
 
+import json
 from collections.abc import AsyncGenerator
 
 import httpx
 import pytest
 import respx
 
-from purple_mcp.libs.sdl import SDLQueryClient, create_sdl_settings
+from purple_mcp.libs.sdl.config import create_sdl_settings
+from purple_mcp.libs.sdl.sdl_query_client import SDLQueryClient
 
 
 @pytest.fixture
@@ -246,6 +248,48 @@ class TestSDLQueryClientRetryPolicy:
         assert route.call_count == 1
 
     @pytest.mark.respx(base_url="https://test.example.test")
+    @pytest.mark.parametrize(
+        "query_origin",
+        [
+            None,
+            "purple_mcp",
+        ],
+    )
+    async def test_submit_sets_query_origin_only_when_configured(
+        self,
+        client_zero_retries: SDLQueryClient,
+        auth_token: str,
+        respx_mock: respx.MockRouter,
+        query_origin: str | None,
+    ) -> None:
+        """Test that queryOrigin is included only when a query origin is provided."""
+        route = respx_mock.post("/sdl/v2/api/queries").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": "test-query-123",
+                    "stepsCompleted": 0,
+                    "totalSteps": 1,
+                },
+                headers={"X-Dataset-Query-Forward-Tag": "forward-tag-123"},
+            )
+        )
+
+        await client_zero_retries.submit(
+            auth_token=auth_token,
+            start_time="1h",
+            end_time="now",
+            query_origin=query_origin,
+        )
+
+        request_payload = json.loads(route.calls.last.request.content.decode())
+        assert isinstance(request_payload, dict)
+        if query_origin is None:
+            assert "queryOrigin" not in request_payload
+        else:
+            assert request_payload["queryOrigin"] == query_origin
+
+    @pytest.mark.respx(base_url="https://test.example.test")
     async def test_three_retries_succeeds_on_second_attempt(
         self,
         client_three_retries: SDLQueryClient,
@@ -282,6 +326,72 @@ class TestSDLQueryClientRetryPolicy:
 
         # Verify the request was attempted twice (1 failure + 1 success)
         assert route.call_count == 2
+
+    @pytest.mark.respx(base_url="https://test.example.test")
+    @pytest.mark.parametrize(
+        ["error_side_effect", "error_log_message", "error_log_status_code"],
+        [
+            (
+                httpx.Response(500, json={"error": "Server error"}),
+                "HTTP request failed with HTTPStatusError",
+                500,
+            ),
+            (
+                httpx.ReadTimeout("Read timed out"),
+                "HTTP request failed with HTTPError",
+                None,
+            ),
+        ],
+    )
+    async def test_http_status_error_logs_emitted_while_retrying(
+        self,
+        client_three_retries: SDLQueryClient,
+        auth_token: str,
+        respx_mock: respx.MockRouter,
+        caplog: pytest.LogCaptureFixture,
+        error_side_effect: httpx.ReadTimeout | httpx.Response,
+        error_log_message: str,
+        error_log_status_code: int | None,
+    ) -> None:
+        """Test that attempts hitting HTTPStatusError are logged."""
+        expected_number_of_error_calls = 1
+
+        # Mock: first attempt fails, second succeeds
+        route = respx_mock.post("/sdl/v2/api/queries").mock(
+            side_effect=[
+                error_side_effect,
+                httpx.Response(
+                    200,
+                    json={
+                        "id": "test-query-456",
+                        "stepsCompleted": 0,
+                        "totalSteps": 1,
+                    },
+                    headers={"X-Dataset-Query-Forward-Tag": "forward-tag-456"},
+                ),
+            ]
+        )
+
+        # Make the request - should succeed on second attempt
+        response, forward_tag = await client_three_retries.submit(
+            auth_token=auth_token,
+            start_time="1h",
+            end_time="now",
+        )
+
+        # Verify the response is valid
+        assert response.id == "test-query-456"
+        assert forward_tag == "forward-tag-456"
+
+        # Verify the request was attempted twice (1 failure + 1 success)
+        assert route.call_count == 2
+
+        http_status_err_logs = [rec for rec in caplog.records if error_log_message in rec.message]
+        assert len(http_status_err_logs) == expected_number_of_error_calls
+        if error_log_status_code is not None:
+            for record in http_status_err_logs:
+                # type-ignore here as we're intentionally grabbing a dynamic log-extras attribute
+                assert record.status_code == error_log_status_code  # type:ignore[attr-defined]
 
 
 class TestRetryPolicyRegression:

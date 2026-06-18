@@ -37,6 +37,9 @@ def misconfigurations_config(integration_env_check: dict[str, str]) -> Misconfig
     """
     settings = get_settings()
 
+    # Ensure required credentials are not None for integration tests
+    assert settings.graphql_service_token is not None
+
     return MisconfigurationsConfig(
         graphql_url=settings.misconfigurations_graphql_url,
         auth_token=settings.graphql_service_token,
@@ -606,7 +609,7 @@ class TestFulltextFilters:
             FilterInput.model_validate(
                 {
                     "fieldId": "assetName",
-                    "matchIn": {"values": ["server", "prod", "web"]},
+                    "matchIn": {"values": ["server", "test", "web"]},
                 }
             )
         ]
@@ -909,7 +912,7 @@ class TestFilterCombinations:
             FilterInput.model_validate(
                 {
                     "fieldId": "environment",
-                    "stringEqual": {"value": "Production"},
+                    "stringEqual": {"value": "Testing"},
                 }
             ),
         ]
@@ -1007,7 +1010,7 @@ class TestFieldVariations:
             FilterInput.model_validate(
                 {
                     "fieldId": "environment",
-                    "stringIn": {"values": ["Production", "Staging"]},
+                    "stringIn": {"values": ["Testing", "Staging"]},
                 }
             )
         ]

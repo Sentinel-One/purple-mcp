@@ -28,26 +28,20 @@ def clean_environment() -> Generator[None, None, None]:
 
 @pytest.fixture
 def development_environment(clean_environment: None) -> None:
-    """Fixture to set development environment."""
+    """Fixture to set environment to 'development'."""
     os.environ[f"{ENV_PREFIX}ENV"] = "development"
 
 
 @pytest.fixture
-def production_environment(clean_environment: None) -> None:
-    """Fixture to set production environment."""
-    os.environ[f"{ENV_PREFIX}ENV"] = "production"
+def release_environment(clean_environment: None) -> None:
+    """Fixture to set environment to 'release'."""
+    os.environ[f"{ENV_PREFIX}ENV"] = "release"
 
 
 @pytest.fixture
-def staging_environment(clean_environment: None) -> None:
-    """Fixture to set staging environment."""
-    os.environ[f"{ENV_PREFIX}ENV"] = "staging"
-
-
-@pytest.fixture
-def test_environment(clean_environment: None) -> None:
-    """Fixture to set test environment."""
-    os.environ[f"{ENV_PREFIX}ENV"] = "test"
+def testing_environment(clean_environment: None) -> None:
+    """Fixture to set environment to 'testing'."""
+    os.environ[f"{ENV_PREFIX}ENV"] = "testing"
 
 
 @pytest.fixture
@@ -139,32 +133,32 @@ class TestSDLTLSConfigurationSecurity:
         assert len(isolated_warnings) >= 1
         assert "SECURITY WARNING" in str(isolated_warnings[0].message)
 
-    def test_tls_bypass_forbidden_in_production(self) -> None:
-        """Test that TLS bypass is forbidden in production environment."""
+    def test_tls_bypass_forbidden_in_release(self) -> None:
+        """Test that TLS bypass is forbidden in release environment."""
         with pytest.raises(ValidationError) as exc_info:
             create_sdl_settings(
                 base_url="https://test.example.test",
                 auth_token="test-token",
                 skip_tls_verify=True,
-                environment="production",
+                environment="release",
             )
 
         error_msg = str(exc_info.value)
-        assert "TLS verification bypass is FORBIDDEN in production" in error_msg
+        assert "TLS verification bypass is FORBIDDEN in release environments" in error_msg
         assert "critical security risk" in error_msg
 
-    def test_tls_bypass_forbidden_in_prod_environment(self) -> None:
-        """Test that TLS bypass is forbidden in 'prod' environment."""
+    def test_tls_bypass_forbidden_in_release_environment(self) -> None:
+        """Test that TLS bypass is forbidden in 'release' environment."""
         with pytest.raises(ValidationError) as exc_info:
             create_sdl_settings(
                 base_url="https://test.example.test",
                 auth_token="test-token",
                 skip_tls_verify=True,
-                environment="prod",
+                environment="release",
             )
 
         error_msg = str(exc_info.value)
-        assert "TLS verification bypass is FORBIDDEN in production" in error_msg
+        assert "TLS verification bypass is FORBIDDEN in release environments" in error_msg
 
     def test_tls_bypass_warning_in_non_development_environment(
         self,
@@ -176,7 +170,7 @@ class TestSDLTLSConfigurationSecurity:
             base_url="https://test.example.test",
             auth_token="test-token",
             skip_tls_verify=True,
-            environment="staging",
+            environment="testing",
         )
 
         assert settings.skip_tls_verify is True
@@ -197,7 +191,7 @@ class TestSDLTLSConfigurationSecurity:
         )
         assert error_record is not None
         assert hasattr(error_record, "environment")
-        assert error_record.environment == "staging"
+        assert error_record.environment == "testing"
 
     def test_tls_bypass_comprehensive_logging(self, caplog: LogCaptureFixture) -> None:
         """Test comprehensive logging when TLS bypass is enabled."""
@@ -268,13 +262,13 @@ class TestSDLQueryClientTLSSecurity:
         assert hasattr(client_record, "target_url")
         assert client_record.target_url == "https://test.example.test"
 
-    def test_client_initialization_forbidden_in_production(self) -> None:
-        """Test that client initialization is forbidden in production with TLS bypass."""
+    def test_client_initialization_forbidden_in_release(self) -> None:
+        """Test that client initialization is forbidden in release environments with TLS bypass."""
         settings = create_sdl_settings(
             base_url="https://test.example.test",
             auth_token="test-token",
             skip_tls_verify=False,
-            environment="production",
+            environment="release",
         )
 
         # Manually set skip_tls_verify to bypass config validation
@@ -285,7 +279,7 @@ class TestSDLQueryClientTLSSecurity:
 
         error_msg = str(exc_info.value)
         assert "SECURITY ERROR" in error_msg
-        assert "TLS verification bypass is FORBIDDEN in production" in error_msg
+        assert "TLS verification bypass is FORBIDDEN in release environments" in error_msg
 
     async def test_client_tls_enabled_no_warnings(
         self,
@@ -453,15 +447,15 @@ class TestSDLTLSSecurityIntegration:
         ]
         assert len(security_warnings) >= 2  # One from config, one from client
 
-    def test_end_to_end_production_protection(self) -> None:
-        """Test that production environment is properly protected."""
+    def test_end_to_end_release_protection(self) -> None:
+        """Test that release environments are properly protected."""
         # Should fail at config level
         with pytest.raises(ValidationError):
             create_sdl_settings(
                 base_url="https://test.example.test",
                 auth_token="test-token",
                 skip_tls_verify=True,
-                environment="production",
+                environment="release",
             )
 
         # Should also fail at client level if config validation is bypassed
@@ -469,7 +463,7 @@ class TestSDLTLSSecurityIntegration:
             base_url="https://test.example.test",
             auth_token="test-token",
             skip_tls_verify=False,
-            environment="production",
+            environment="release",
         )
         settings.skip_tls_verify = True
 

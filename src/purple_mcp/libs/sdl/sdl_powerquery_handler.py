@@ -97,6 +97,7 @@ class SDLPowerQueryHandler(SDLHandler):
         tenant: bool | None = None,
         account_ids: list[str] | None = None,
         query_priority: SDLQueryPriority = SDLQueryPriority.LOW,
+        query_origin: str | None = None,
         headers: Headers | None = None,
     ) -> None:
         """Launch a SDL powerquery.
@@ -110,6 +111,7 @@ class SDLPowerQueryHandler(SDLHandler):
             tenant: The tenant for the query.
             account_ids: The account IDs for the query.
             query_priority: The priority for the query.
+            query_origin: Optional query origin for SDL provenance tracking.
             headers: The headers for the query.
 
         Raises:
@@ -130,6 +132,7 @@ class SDLPowerQueryHandler(SDLHandler):
                 result_type=result_type,
                 frequency=frequency,
             ),
+            query_origin=query_origin,
             headers=headers,
         )
 
@@ -158,10 +161,6 @@ class SDLPowerQueryHandler(SDLHandler):
     async def process_results(self, response: SDLQueryResult) -> None:
         """Process the results from the SDL query response.
 
-        This method accumulates results from paginated query responses while enforcing
-        the max_query_results limit. If the limit is reached, results are truncated
-        and a warning is logged.
-
         Args:
             response: The response from the SDL query containing the data.
 
@@ -175,9 +174,43 @@ class SDLPowerQueryHandler(SDLHandler):
         if self.results is None:
             raise SDLHandlerError("Cannot process results when results are None.")
 
+        # Updated the results
         self.results.columns = response.data.columns
 
-        # Must happen before early return to capture authoritative values from this page
+        # Handle row accumulation with limit enforcement
+        current_count = len(self.results.values)
+        new_count = len(response.data.values)
+        max_results = self.settings.max_query_results
+
+        if current_count >= max_results:
+            if not self.results.truncated_at_limit:
+                logger.warning(
+                    "Query result limit reached, skipping additional results",
+                    extra={
+                        "current_count": current_count,
+                        "limit": max_results,
+                        "truncated": True,
+                    },
+                )
+                self.results.truncated_at_limit = True
+        elif current_count + new_count > max_results:
+            remaining = max_results - current_count
+            logger.warning(
+                "Query result limit reached, truncating results",
+                extra={
+                    "current_count": current_count,
+                    "new_count": new_count,
+                    "limit": max_results,
+                    "truncating_to": remaining,
+                    "truncated": True,
+                },
+            )
+            self.results.values.extend(response.data.values[:remaining])
+            self.results.truncated_at_limit = True
+        else:
+            self.results.values.extend(response.data.values)
+
+        # Always update metadata regardless of limit status
         self.results.warnings = response.data.warnings
         self.results.match_count = response.data.match_count
 
@@ -194,37 +227,3 @@ class SDLPowerQueryHandler(SDLHandler):
 
         if response.data.omitted_events is not None:
             self.results.omitted_events = response.data.omitted_events
-
-        current_count = len(self.results.values)
-        new_count = len(response.data.values)
-        max_results = self.settings.max_query_results
-
-        if current_count >= max_results:
-            if not self.results.truncated_at_limit:
-                logger.warning(
-                    "Query result limit reached, skipping additional results",
-                    extra={
-                        "current_count": current_count,
-                        "limit": max_results,
-                        "truncated": True,
-                    },
-                )
-                self.results.truncated_at_limit = True
-            return
-
-        if current_count + new_count > max_results:
-            remaining = max_results - current_count
-            logger.warning(
-                "Query result limit reached, truncating results",
-                extra={
-                    "current_count": current_count,
-                    "new_count": new_count,
-                    "limit": max_results,
-                    "truncating_to": remaining,
-                    "truncated": True,
-                },
-            )
-            self.results.values.extend(response.data.values[:remaining])
-            self.results.truncated_at_limit = True
-        else:
-            self.results.values.extend(response.data.values)

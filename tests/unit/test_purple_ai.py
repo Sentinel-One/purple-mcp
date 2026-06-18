@@ -3,7 +3,8 @@
 import re
 import string
 import uuid
-from unittest.mock import patch
+from datetime import datetime, timedelta, timezone
+from unittest.mock import Mock
 
 import httpx
 import pytest
@@ -17,6 +18,7 @@ from purple_mcp.libs.purple_ai import (
     PurpleAIResultType,
     PurpleAIUserDetails,
     ask_purple,
+    client,
     sync_ask_purple,
 )
 from purple_mcp.libs.purple_ai.client import _random_conv_id
@@ -28,8 +30,6 @@ def purple_ai_config() -> PurpleAIConfig:
     return PurpleAIConfig(
         auth_token="TEST_AUTH_TOKEN",
         user_details=PurpleAIUserDetails(
-            account_id="TEST_ACCOUNT",
-            team_token="TEST_TEAM",
             session_id=uuid.uuid4().hex,
             email_address="test@example.test",
             user_agent="TestClient/1.0",
@@ -247,7 +247,10 @@ async def test_ask_purple_invalid_result_type(
 
 
 async def test_ask_purple_unhandled_result_type(
-    purple_ai_config: PurpleAIConfig, respx_mock: MockRouter, purple_ai_env: None
+    purple_ai_config: PurpleAIConfig,
+    respx_mock: MockRouter,
+    purple_ai_env: None,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test error handling for unhandled result types."""
     # Create a mock response with a valid enum value but unhandled case
@@ -262,20 +265,21 @@ async def test_ask_purple_unhandled_result_type(
     }
 
     # Mock the response to return a different result type to test the else case
-    with patch("purple_mcp.libs.purple_ai.client.PurpleAIResultType") as mock_enum:
-        # Create a mock enum value that's not MESSAGE or POWER_QUERY
-        mock_result_type = mock_enum.return_value
-        mock_result_type.name = "UNKNOWN_HANDLED_TYPE"
-        mock_enum.return_value = mock_result_type
+    # Create a mock enum value that's not MESSAGE or POWER_QUERY
+    mock_result_type = Mock()
+    mock_result_type.name = "UNKNOWN_HANDLED_TYPE"
+    mock_enum = Mock(return_value=mock_result_type)
 
-        respx_mock.post(purple_ai_config.graphql_url).mock(
-            return_value=httpx.Response(200, json=mock_response)
-        )
+    monkeypatch.setattr(client, PurpleAIResultType.__name__, mock_enum)
 
-        result_type, response = await ask_purple(purple_ai_config, "test query")
+    respx_mock.post(purple_ai_config.graphql_url).mock(
+        return_value=httpx.Response(200, json=mock_response)
+    )
 
-        assert result_type is None
-        assert "Unhandled result type from Purple AI:" in response
+    result_type, response = await ask_purple(purple_ai_config, "test query")
+
+    assert result_type is None
+    assert "Unhandled result type from Purple AI:" in response
 
 
 def test_sync_ask_purple_error_handling(
@@ -514,8 +518,6 @@ def test_purple_ai_config_graphql_url_requires_https() -> None:
             graphql_url="http://insecure.example.test/graphql",
             auth_token="TEST_TOKEN",
             user_details=PurpleAIUserDetails(
-                account_id="TEST_ACCOUNT",
-                team_token="TEST_TEAM",
                 session_id=uuid.uuid4().hex,
                 email_address="test@example.test",
                 user_agent="TestClient/1.0",
@@ -535,8 +537,6 @@ def test_purple_ai_config_graphql_url_strips_whitespace() -> None:
         graphql_url="https://test.example.test/graphql  \n",
         auth_token="TEST_TOKEN",
         user_details=PurpleAIUserDetails(
-            account_id="TEST_ACCOUNT",
-            team_token="TEST_TEAM",
             session_id=uuid.uuid4().hex,
             email_address="test@example.test",
             user_agent="TestClient/1.0",
@@ -557,8 +557,6 @@ def test_purple_ai_config_graphql_url_strips_leading_whitespace() -> None:
         graphql_url="  \n\thttps://test.example.test/graphql",
         auth_token="TEST_TOKEN",
         user_details=PurpleAIUserDetails(
-            account_id="TEST_ACCOUNT",
-            team_token="TEST_TEAM",
             session_id=uuid.uuid4().hex,
             email_address="test@example.test",
             user_agent="TestClient/1.0",
@@ -579,8 +577,6 @@ def test_purple_ai_config_auth_token_cannot_be_empty() -> None:
         PurpleAIConfig(
             auth_token="   ",
             user_details=PurpleAIUserDetails(
-                account_id="TEST_ACCOUNT",
-                team_token="TEST_TEAM",
                 session_id=uuid.uuid4().hex,
                 email_address="test@example.test",
                 user_agent="TestClient/1.0",
@@ -599,8 +595,6 @@ def test_purple_ai_config_auth_token_strips_whitespace() -> None:
     config = PurpleAIConfig(
         auth_token="  TEST_TOKEN  ",
         user_details=PurpleAIUserDetails(
-            account_id="TEST_ACCOUNT",
-            team_token="TEST_TEAM",
             session_id=uuid.uuid4().hex,
             email_address="test@example.test",
             user_agent="TestClient/1.0",
@@ -622,8 +616,6 @@ def test_purple_ai_config_timeout_must_be_positive() -> None:
             auth_token="TEST_TOKEN",
             timeout=0.0,
             user_details=PurpleAIUserDetails(
-                account_id="TEST_ACCOUNT",
-                team_token="TEST_TEAM",
                 session_id=uuid.uuid4().hex,
                 email_address="test@example.test",
                 user_agent="TestClient/1.0",
@@ -644,8 +636,6 @@ def test_purple_ai_config_timeout_cannot_be_negative() -> None:
             auth_token="TEST_TOKEN",
             timeout=-10.0,
             user_details=PurpleAIUserDetails(
-                account_id="TEST_ACCOUNT",
-                team_token="TEST_TEAM",
                 session_id=uuid.uuid4().hex,
                 email_address="test@example.test",
                 user_agent="TestClient/1.0",
@@ -665,8 +655,6 @@ def test_purple_ai_config_accepts_valid_timeout() -> None:
         auth_token="TEST_TOKEN",
         timeout=60.5,
         user_details=PurpleAIUserDetails(
-            account_id="TEST_ACCOUNT",
-            team_token="TEST_TEAM",
             session_id=uuid.uuid4().hex,
             email_address="test@example.test",
             user_agent="TestClient/1.0",
@@ -686,7 +674,6 @@ def test_purple_ai_console_details_base_url_requires_https() -> None:
     with pytest.raises(ValidationError, match="base_url must use HTTPS protocol"):
         PurpleAIConsoleDetails(
             base_url="http://insecure.example.test",
-            version="1.0.0",
         )
 
 
@@ -694,7 +681,6 @@ def test_purple_ai_console_details_accepts_valid_https_url() -> None:
     """Test that console base_url accepts valid HTTPS URLs."""
     console = PurpleAIConsoleDetails(
         base_url="https://secure.example.test",
-        version="1.0.0",
     )
     assert console.base_url == "https://secure.example.test"
 
@@ -703,7 +689,6 @@ def test_purple_ai_console_details_base_url_strips_leading_whitespace() -> None:
     """Test that console base_url strips leading whitespace before validation."""
     console = PurpleAIConsoleDetails(
         base_url="  \thttps://secure.example.test",
-        version="1.0.0",
     )
     assert console.base_url == "https://secure.example.test"
 
@@ -731,3 +716,69 @@ def test_random_conv_id_uniqueness() -> None:
 
     # All IDs should be unique
     assert len(ids) == num_ids
+
+
+@pytest.mark.parametrize("scope_field", ["tenant_id", "account_id", "site_id"])
+@pytest.mark.parametrize("bad_value", ["", "   ", "\t\n"])
+def test_purple_ai_console_details_rejects_empty_scope_id(
+    scope_field: str, bad_value: str
+) -> None:
+    """Empty / whitespace-only scope IDs are rejected at the basemodel layer."""
+    kwargs: dict[str, str | None] = {"base_url": "https://example.test"}
+    kwargs[scope_field] = bad_value
+    with pytest.raises(ValidationError, match=r"scope ID must be a non-empty string"):
+        PurpleAIConsoleDetails(**kwargs)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "scope_field,good_value",
+    [
+        ("tenant_id", "acc-abc-123"),  # non-numeric is fine by design
+        ("account_id", "9876543210987654321"),
+        ("site_id", "  1111111111111111111  "),  # stripped
+    ],
+)
+def test_purple_ai_console_details_accepts_valid_scope_id(
+    scope_field: str, good_value: str
+) -> None:
+    """Non-empty scope IDs pass validation; whitespace is stripped."""
+    kwargs: dict[str, str | None] = {"base_url": "https://example.test"}
+    kwargs[scope_field] = good_value
+    console = PurpleAIConsoleDetails(**kwargs)  # type: ignore[arg-type]
+    assert getattr(console, scope_field) == good_value.strip()
+
+
+def test_purple_ai_console_details_accepts_none_scope_ids() -> None:
+    """All scope IDs default to None when unset."""
+    console = PurpleAIConsoleDetails(base_url="https://example.test")
+    assert console.console_id is None
+    assert console.tenant_id is None
+    assert console.account_id is None
+    assert console.site_id is None
+
+
+def test_purple_ai_user_details_user_time_defaults_to_now_local() -> None:
+    """user_time defaults to a timezone-aware timestamp at the current local time."""
+    before = datetime.now().astimezone()
+    user = PurpleAIUserDetails(session_id="abc", user_agent="agent")
+    after = datetime.now().astimezone()
+
+    assert user.user_time is not None
+    # Timezone-aware (local offset present), not a naive datetime.
+    assert user.user_time.tzinfo is not None
+    assert user.user_time.utcoffset() is not None
+    # Captured at construction time, between the two reference reads.
+    assert before <= user.user_time <= after
+
+
+def test_purple_ai_user_details_user_time_accepts_explicit_value() -> None:
+    """An explicit user_time is preserved rather than overwritten by the default."""
+    explicit = datetime(2026, 5, 12, 14, 30, 0, tzinfo=timezone(timedelta(hours=-7)))
+    user = PurpleAIUserDetails(session_id="abc", user_agent="agent", user_time=explicit)
+    assert user.user_time == explicit
+
+
+def test_purple_ai_user_details_user_time_accepts_none() -> None:
+    """user_time may be explicitly suppressed with None."""
+    user = PurpleAIUserDetails(session_id="abc", user_agent="agent", user_time=None)
+    assert user.user_time is None

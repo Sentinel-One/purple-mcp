@@ -25,6 +25,9 @@ def vulnerabilities_config(integration_env_check: dict[str, str]) -> Vulnerabili
     """
     settings = get_settings()
 
+    # Ensure required credentials are not None for integration tests
+    assert settings.graphql_service_token is not None
+
     return VulnerabilitiesConfig(
         graphql_url=settings.vulnerabilities_graphql_url,
         auth_token=settings.graphql_service_token,

@@ -110,10 +110,11 @@ class InventoryClient:
             item_id: The ID of the inventory item
 
         Returns:
-            The inventory item if found, None otherwise
+            The inventory item if found, None if no item matches the ID
 
         Raises:
             InventoryAuthenticationError: If authentication fails
+            InventoryNotFoundError: If the API returns 404 (misconfigured endpoint)
             InventoryAPIError: If the API returns an error
             InventoryNetworkError: If a network error occurs
         """
@@ -143,14 +144,18 @@ class InventoryClient:
             return None
 
         except InventoryNotFoundError:
-            logger.debug(
-                "Inventory item not found (InventoryNotFoundError)", extra={"item_id": item_id}
+            # Re-raise 404 errors as they indicate misconfiguration (wrong endpoint, missing feature)
+            # The API returns 200 with empty data for legitimate "no results" cases
+            logger.error(
+                "Inventory API returned 404 - likely misconfigured endpoint or unavailable feature",
+                extra={"item_id": item_id},
             )
-            return None
+            raise
         except Exception as e:
-            logger.exception(
+            logger.error(
                 "Failed to get inventory item",
                 extra={"item_id": item_id, "error": str(e)},
+                exc_info=e,
             )
             raise
 
@@ -212,7 +217,10 @@ class InventoryClient:
         return response
 
     async def list_inventory(
-        self, limit: int = 50, skip: int = 0, surface: Surface | None = None
+        self,
+        limit: int = 50,
+        skip: int = 0,
+        surface: Surface | None = None,
     ) -> InventoryResponse:
         """List inventory items with pagination and automatic retry on transient failures.
 
@@ -236,7 +244,12 @@ class InventoryClient:
 
         logger.debug(
             "Listing inventory items",
-            extra={"limit": limit, "skip": skip, "surface": surface, "endpoint": endpoint},
+            extra={
+                "limit": limit,
+                "skip": skip,
+                "surface": surface,
+                "endpoint": endpoint,
+            },
         )
 
         try:
@@ -245,25 +258,28 @@ class InventoryClient:
             # Unwrap the retry error to get the original exception
             original_exception = e.last_attempt.exception()
             if isinstance(original_exception, httpx.TimeoutException):
-                logger.exception(
+                logger.error(
                     "Timeout listing inventory items after retries",
                     extra={"endpoint": endpoint, "limit": limit, "skip": skip},
+                    exc_info=original_exception,
                 )
                 raise InventoryNetworkError(
                     f"Request timeout: {original_exception}"
                 ) from original_exception
             elif isinstance(original_exception, (httpx.NetworkError, httpx.RequestError)):
-                logger.exception(
+                logger.error(
                     "Network error listing inventory items after retries",
                     extra={"endpoint": endpoint, "limit": limit, "skip": skip},
+                    exc_info=original_exception,
                 )
                 raise InventoryNetworkError(
                     f"Network error: {original_exception}"
                 ) from original_exception
             elif isinstance(original_exception, InventoryTransientError):
-                logger.exception(
+                logger.error(
                     "Transient server error persisted after retries",
                     extra={"endpoint": endpoint, "limit": limit, "skip": skip},
+                    exc_info=original_exception,
                 )
                 raise InventoryAPIError(
                     f"Server returned transient error after multiple retries: {original_exception}"
@@ -272,15 +288,17 @@ class InventoryClient:
                 # Re-raise if it's not a known exception
                 raise
         except httpx.TimeoutException as e:
-            logger.exception(
+            logger.error(
                 "Timeout listing inventory items",
                 extra={"endpoint": endpoint, "limit": limit, "skip": skip},
+                exc_info=e,
             )
             raise InventoryNetworkError(f"Request timeout: {e}") from e
         except (httpx.NetworkError, httpx.RequestError) as e:
-            logger.exception(
+            logger.error(
                 "Network error listing inventory items",
                 extra={"endpoint": endpoint, "limit": limit, "skip": skip},
+                exc_info=e,
             )
             raise InventoryNetworkError(f"Network error: {e}") from e
 
@@ -295,9 +313,10 @@ class InventoryClient:
             # Re-raise our typed exceptions unchanged so they remain observable
             raise
         except Exception as e:
-            logger.exception(
+            logger.error(
                 "Unexpected error listing inventory items",
                 extra={"endpoint": endpoint, "limit": limit, "skip": skip},
+                exc_info=e,
             )
             raise InventoryAPIError(f"Unexpected error: {e}") from e
 
@@ -373,7 +392,7 @@ class InventoryClient:
 
         Args:
             filters: Filter dictionary in REST API format (NOT GraphQL format).
-                Examples: {"resourceType": ["Windows Server"]}, {"name__contains": ["prod"]},
+                Examples: {"resourceType": ["Windows Server"]}, {"name__contains": ["test"]},
                 {"lastActiveDt__between": {"from": "2024-01-01", "to": "2024-12-31"}},
                 {"id__in": ["id1", "id2"]}
             limit: Maximum number of items to return (1-1000, default 50)
@@ -468,25 +487,28 @@ class InventoryClient:
                 }
 
             if isinstance(original_exception, httpx.TimeoutException):
-                logger.exception(
+                logger.error(
                     "Timeout searching inventory items after retries",
                     extra=log_extra,
+                    exc_info=original_exception,
                 )
                 raise InventoryNetworkError(
                     f"Request timeout: {original_exception}"
                 ) from original_exception
             elif isinstance(original_exception, (httpx.NetworkError, httpx.RequestError)):
-                logger.exception(
+                logger.error(
                     "Network error searching inventory items after retries",
                     extra=log_extra,
+                    exc_info=original_exception,
                 )
                 raise InventoryNetworkError(
                     f"Network error: {original_exception}"
                 ) from original_exception
             elif isinstance(original_exception, InventoryTransientError):
-                logger.exception(
+                logger.error(
                     "Transient server error persisted after retries",
                     extra=log_extra,
+                    exc_info=original_exception,
                 )
                 raise InventoryAPIError(
                     f"Server returned transient error after multiple retries: {original_exception}"
@@ -511,9 +533,10 @@ class InventoryClient:
                     "limit": limit,
                     "skip": skip,
                 }
-            logger.exception(
+            logger.error(
                 "Timeout searching inventory items",
                 extra=log_extra,
+                exc_info=e,
             )
             raise InventoryNetworkError(f"Request timeout: {e}") from e
         except (httpx.NetworkError, httpx.RequestError) as e:
@@ -533,9 +556,10 @@ class InventoryClient:
                     "limit": limit,
                     "skip": skip,
                 }
-            logger.exception(
+            logger.error(
                 "Network error searching inventory items",
                 extra=log_extra,
+                exc_info=e,
             )
             raise InventoryNetworkError(f"Network error: {e}") from e
 
@@ -566,9 +590,10 @@ class InventoryClient:
                     "limit": limit,
                     "skip": skip,
                 }
-            logger.exception(
+            logger.error(
                 "Unexpected error searching inventory items",
                 extra=log_extra,
+                exc_info=e,
             )
             raise InventoryAPIError(f"Unexpected error: {e}") from e
 
@@ -604,7 +629,8 @@ class InventoryClient:
                 f"Authentication failed with status {response.status_code}"
             )
 
-        # Handle not found
+        # Handle not found - raise error as 404 typically indicates misconfiguration
+        # (the API returns 200 with empty data for "no results found")
         if response.status_code == HTTPStatus.NOT_FOUND:
             logger.warning("Resource not found", extra={"url": str(response.url)})
             raise InventoryNotFoundError("Inventory resource not found")
@@ -686,8 +712,9 @@ class InventoryClient:
             return InventoryResponse(data=items, pagination=pagination)
 
         except Exception as e:
-            logger.exception(
+            logger.error(
                 "Failed to parse inventory response",
                 extra={"error": str(e), "response": response.text[:500]},
+                exc_info=e,
             )
             raise InventoryAPIError(f"Failed to parse response: {e}") from e

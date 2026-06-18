@@ -85,8 +85,8 @@ def _apply_environment_overrides(
     configuration to override environment variable defaults.
 
     Args:
-        transport_mode: MCP transport mode to use.
-        sdl_api_token: SDL API authentication token
+        transport_mode: MCP transport mode to use. (stdio, http, streamable-http, or sse)
+        sdl_api_token: SDL API authentication token (deprecated, maps to console token)
         graphql_service_token: GraphQL service authentication token
         console_base_url: Base URL for the console
         graphql_endpoint: GraphQL endpoint path
@@ -96,7 +96,9 @@ def _apply_environment_overrides(
     if transport_mode:
         os.environ[f"{ENV_PREFIX}TRANSPORT_MODE"] = transport_mode
     if sdl_api_token:
-        os.environ[f"{ENV_PREFIX}SDL_READ_LOGS_TOKEN"] = sdl_api_token
+        # Map deprecated --sdl-api-token to CONSOLE_TOKEN
+        # Settings.sdl_api_token now aliases CONSOLE_TOKEN, so set that instead
+        os.environ[f"{ENV_PREFIX}CONSOLE_TOKEN"] = sdl_api_token
     if graphql_service_token:
         os.environ[f"{ENV_PREFIX}CONSOLE_TOKEN"] = graphql_service_token
     if console_base_url:
@@ -341,9 +343,9 @@ def _run_mode(
 )
 @click.option(
     "--sdl-api-token",
-    envvar=f"{ENV_PREFIX}SDL_READ_LOGS_TOKEN",
+    envvar=f"{ENV_PREFIX}CONSOLE_TOKEN",
     hidden=True,
-    help=f"[DEPRECATED] Use --graphql-service-token instead (env: {ENV_PREFIX}SDL_READ_LOGS_TOKEN)",
+    help=f"[DEPRECATED] Use --graphql-service-token instead (now maps to {ENV_PREFIX}CONSOLE_TOKEN)",
 )
 @click.option(
     "--graphql-service-token",
@@ -423,6 +425,7 @@ def main(
     )
 
     settings = _create_settings()
+
     click.echo("✓ Configuration validated successfully", err=True)
     if verbose:
         click.echo(f"  GraphQL URL: {settings.graphql_full_url}", err=True)

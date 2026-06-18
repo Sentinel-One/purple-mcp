@@ -1,18 +1,21 @@
 # AI Agent Guidelines for Purple MCP
 
-This document provides essential guidelines for AI agents contributing to the Purple MCP codebase. For comprehensive details, see [CONTRIBUTING.md](CONTRIBUTING.md).
+This document provides essential guidelines for AI agents contributing to the Purple MCP codebase.
+For comprehensive details, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Quick Reference
 
-- **Language**: Python >=3.10
+- **Language**: Python >=3.11
 - **Package Manager**: `uv` (never use `pip install` or `uv pip`)
-- **Code Quality**: Must pass `uv run ruff format`, `uv run ruff check --fix`, and `uv run mypy`
+- **Code Quality**: Must pass `uv run ruff format`, `uv run ruff check . --fix`, and
+  `uv run mypy src tests`
 - **Testing**: Comprehensive tests required (unit + integration)
 - **Architecture**: Strict separation between `libs/` (business logic) and `tools/` (MCP adapters)
 
 ## Project Overview
 
-Purple MCP is a Model Context Protocol (MCP) server providing access to SentinelOne Purple AI and Singularity Data Lake capabilities. The project emphasizes:
+Purple MCP is a Model Context Protocol (MCP) server providing access to SentinelOne Purple AI and
+Singularity Data Lake capabilities. The project emphasizes:
 
 - **Simplicity, readability, maintainability over cleverness**
 - **Clean separation of concerns** (Tools vs Libraries)
@@ -22,6 +25,7 @@ Purple MCP is a Model Context Protocol (MCP) server providing access to Sentinel
 ### Current Tools and Libraries
 
 The project provides the following MCP tools (in `src/purple_mcp/tools/`):
+
 - **purple_ai**: Natural language queries to Purple AI
 - **sdl**: Singularity Data Lake query execution and timestamp utilities
 - **alerts**: Security alerts management (list, search, get details, notes, history)
@@ -30,7 +34,8 @@ The project provides the following MCP tools (in `src/purple_mcp/tools/`):
 - **inventory**: Unified Asset Inventory management
 - **purple_utils**: Utility tools for Purple AI (status checks, available tools)
 
-Each tool has a corresponding library in `src/purple_mcp/libs/` with standalone, reusable business logic.
+Each tool has a corresponding library in `src/purple_mcp/libs/` with standalone, reusable business
+logic.
 
 ## Critical Architecture Pattern: Tools vs Libraries
 
@@ -42,7 +47,6 @@ Libraries implement **standalone, reusable business logic**:
 
 ```python
 # ✅ CORRECT: Library with explicit configuration
-import uuid
 from purple_mcp.libs.purple_ai import (
     PurpleAIConfig,
     PurpleAIUserDetails,
@@ -51,18 +55,12 @@ from purple_mcp.libs.purple_ai import (
 )
 
 user_details = PurpleAIUserDetails(
-    account_id="account-123",
-    team_token="team-token",
-    session_id=uuid.uuid4().hex,
-    email_address="user@example.com",
+    session_id="abc123",
     user_agent="purple-mcp/1.0",
-    build_date="2024-01-01",
-    build_hash="abc123",
 )
 
 console_details = PurpleAIConsoleDetails(
     base_url="https://your-console.sentinelone.net",
-    version="1.0.0",
 )
 
 config = PurpleAIConfig(
@@ -77,6 +75,7 @@ response_type, message = await ask_purple(config, "Is Salt Typhoon in my environ
 ```
 
 **Library Requirements:**
+
 - ❌ No global state or singletons
 - ❌ No environment variable access
 - ❌ No imports from `purple_mcp.config`
@@ -104,18 +103,12 @@ async def purple_ai(query: str) -> str:
 
     # 2. Build library-specific configuration objects
     user_details = PurpleAIUserDetails(
-        account_id=settings.purple_ai_account_id,
-        team_token=settings.purple_ai_team_token,
         session_id=settings.purple_ai_session_id,
-        email_address=settings.purple_ai_email_address,
         user_agent=settings.purple_ai_user_agent,
-        build_date=settings.purple_ai_build_date,
-        build_hash=settings.purple_ai_build_hash,
     )
 
     console_details = PurpleAIConsoleDetails(
         base_url=settings.sentinelone_console_base_url,
-        version=settings.purple_ai_console_version,
     )
 
     config = PurpleAIConfig(
@@ -136,14 +129,42 @@ async def purple_ai(query: str) -> str:
 ```
 
 **Tool Requirements:**
+
 - ✅ Use `get_settings()` for configuration
 - ✅ Create explicit library config objects
 - ✅ Delegate business logic to libraries
 - ✅ Handle MCP-specific concerns (serialization, error formatting)
 
+**Configuration Access Rule:**
+
+Tools MUST use `get_settings()` to access configuration. Never read environment variables directly
+with `os.getenv()` or access `purple_mcp.config` module variables, as this bypasses the request
+override system and breaks remote authentication mode.
+
+```python
+# ✅ CORRECT: Use get_settings()
+from purple_mcp.config import get_settings
+
+async def my_tool(query: str) -> str:
+    settings = get_settings()  # Automatically applies request overrides
+    # Use settings.graphql_service_token, settings.sentinelone_console_base_url, etc.
+
+# ❌ WRONG: Direct environment variable access
+import os
+
+async def my_tool(query: str) -> str:
+    token = os.getenv("PURPLEMCP_CONSOLE_TOKEN")  # Breaks remote auth!
+    # This bypasses request overrides and always uses static config
+```
+
+The `get_settings()` function automatically applies request-scoped overrides when available (remote
+auth mode with per-request headers) and falls back to static configuration otherwise. Direct
+environment access breaks this mechanism.
+
 ### Why This Matters
 
 ❌ **WRONG** - Library with global state:
+
 ```python
 # This violates the architecture and will be rejected
 from purple_mcp.libs.my_lib import client  # Global client instance
@@ -151,6 +172,7 @@ result = client.query("data")  # Uses implicit global configuration
 ```
 
 ✅ **CORRECT** - Library with explicit config:
+
 ```python
 from purple_mcp.libs.my_lib import MyClient, MyConfig
 
@@ -261,7 +283,7 @@ def validate_base_url(cls, v: str) -> str:
 
 - Default to TLS verification enabled
 - Issue strong warnings when TLS verification disabled
-- Block TLS bypass in production environments
+- Block TLS bypass in release environments
 
 ## Testing Requirements
 
@@ -291,113 +313,158 @@ tests/
 
 ### Writing Tests
 
-We use test helper infrastructure to reduce boilerplate and ensure consistency. Tests follow established patterns with base classes, mock factories, and assertion helpers.
+We use pytest tooling to reduce boilerplate and ensure consistency. Use pytest fixtures and
+parameterization where appropriate to reduce duplication. Fixtures used by multiple test-modules
+should go in conftest.py. Use `pytest.raises` with the `match` argument to check error types and
+error-message fragments. Use Mocks when necessary to prevent calls to external systems from
+unit-tests.
 
 ```python
-# ✅ CORRECT: Using test helpers for clean, maintainable tests
+# ✅ CORRECT: Using pytest tooling for clean, maintainable tests
+import json
+from unittest.mock import AsyncMock, create_autospec
+
 import pytest
-from unittest.mock import Mock, patch
 
-from purple_mcp.tools import alerts
-from purple_mcp.libs.alerts import AlertsClientError
-
-from tests.unit.libs.alerts.helpers import (
-    AlertsTestBase,
-    AlertsTestData,
-    JSONAssertions,
+from purple_mcp.libs.alerts import (
+    Alert,
+    AlertConnection,
+    AlertHistoryConnection,
+    AlertNoteConnection,
+    AlertsClient,
+    AlertsClientError,
+    AlertsGraphQLError,
+    Severity,
+    Status,
 )
+from purple_mcp.tools import alerts
+from purple_mcp.type_defs import JsonDict
+from tests.unit.libs.alerts.helpers import MockAlertsClientBuilder
 
-class TestGetAlert(AlertsTestBase):
+
+@pytest.fixture()
+def fake_alert() -> Alert:
+    """Create a fake alert for testing."""
+    alert_id = "alert-123"
+    name = "Test Alert"
+    severity = "HIGH"
+    status = "NEW"
+    timestamp = "2024-01-01T00:00:00Z"
+
+    return Alert(
+        id=alert_id,
+        name=name,
+        severity=Severity(severity),
+        status=Status(status),
+        detectedAt=timestamp,
+    )
+
+
+class TestGetAlert:
     """Test get_alert tool."""
 
-    @patch("purple_mcp.tools.alerts._get_alerts_client")
     @pytest.mark.asyncio
-    async def test_get_alert_success(self, mock_get_client: Mock) -> None:
+    async def test_get_alert_success(
+        self, fake_alert: Alert, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test successful alert retrieval."""
-        mock_alert = AlertsTestData.create_test_alert()
+        # arrange
+        mock_client = create_autospec(AlertsClient, spec_set=True, instance=True)
+        mock_client.get_alert = AsyncMock(return_value=fake_alert)
+        monkeypatch.setattr(alerts, alerts._get_alerts_client.__name__, lambda: mock_client)
 
-        result = await self.assert_tool_success(
-            alerts.get_alert,
-            mock_get_client,
-            mock_alert,
-            "get_alert",
-            tool_args={"alert_id": "alert-123"},
-        )
+        # act
+        result = await alerts.get_alert(fake_alert.id)
 
-        # Verify JSON response
-        JSONAssertions.assert_alert_response(result, "alert-123")
+        # assert
+        # check method
+        mock_client.get_alert.assert_called_with(alert_id=fake_alert.id)
+        # check result
+        assert isinstance(result, str)
+        data = json.loads(result)
+        assert isinstance(data, dict)
+        fake_alert_dict = fake_alert.model_dump(mode="json")
+        for k, v in data.items():
+            assert v == fake_alert_dict[k]
 
-    @patch("purple_mcp.tools.alerts._get_alerts_client")
     @pytest.mark.asyncio
-    async def test_get_alert_client_error(self, mock_get_client: Mock) -> None:
-        """Test client error handling."""
-        await self.assert_tool_error(
-            alerts.get_alert,
-            mock_get_client,
-            AlertsClientError("Network error"),
-            "get_alert",
-            "Failed to retrieve alert alert-123",
-            tool_args={"alert_id": "alert-123"},
-        )
+    async def test_get_alert_not_found(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test alert not found raises an error."""
+        # arrange
+        mock_client = create_autospec(AlertsClient, spec_set=True, instance=True)
+        mock_client.get_alert = AsyncMock(side_effect=AlertsGraphQLError("Dummy Error"))
+        monkeypatch.setattr(alerts, alerts._get_alerts_client.__name__, lambda: mock_client)
+
+        # act
+        with pytest.raises(RuntimeError, match=r"Failed to retrieve alert nonexistent-alert"):
+            await alerts.get_alert("nonexistent-alert")
+```
+
+#### Mocking with pytest.monkeypatch
+
+Always use `pytest.monkeypatch` instead of `unittest.mock.patch` and use references e.g.
+`.__name__` for usage safety.
+
+```python
+# ❌ WRONG: Using patch with strings
+from unittest.mock import MagicMock
+def test_something():
+    with patch("purple_mcp.cli.Settings") as mock_settings:
+        mock_settings.return_value = MagicMock()
+        ...
+
+# ✅ CORRECT: Use monkeypatch with symbolic references
+import pytest
+from unittest.mock import MagicMock
+from purple_mcp import cli
+from purple_mcp.config import Settings
+
+def test_something(monkeypatch: pytest.MonkeyPatch):
+    mock_settings = MagicMock(return_value=MagicMock())
+    monkeypatch.setattr(cli, Settings.__name__, mock_settings)
+    ...
 ```
 
 ### Test Helper Infrastructure
 
-**Note:** Not all libraries have test helper infrastructure. Currently, alerts, misconfigurations, and vulnerabilities have comprehensive test helpers. Other libraries (purple_ai, sdl, inventory) use more straightforward mocking patterns.
+**Note:** Not all libraries have test helper infrastructure. Currently, misconfigurations, and
+vulnerabilities have comprehensive test helpers. Other libraries (purple_ai, sdl, inventory) use
+more straightforward mocking patterns.
 
 Libraries with test helpers provide:
 
-- **Base test classes** (`AlertsTestBase`, `MisconfigurationsTestBase`, etc.):
+- **Base test classes** (`MisconfigurationsTestBase`, etc.):
   - `assert_tool_success()`: Test successful tool execution
   - `assert_tool_error()`: Test error handling
   - `assert_tool_validation_error()`: Test parameter validation
 
 - **Mock factory classes** (`MockAlertsClientBuilder`, etc.):
-  - `create_mock()`: Create configured mock clients
   - `create_empty_connection()`: Create empty paginated responses
 
 - **JSON assertion helpers** (`JSONAssertions`):
   - `assert_connection_response()`: Validate paginated responses
-  - `assert_alert_response()`: Validate alert data structure
   - `assert_error_message()`: Validate exception messages
 
-- **Test data factories** (`AlertsTestData`, etc.):
-  - `create_test_alert()`: Create test Alert objects
-  - `create_test_note()`: Create test Note objects
-
-Example helper usage:
-```python
-from tests.unit.libs.alerts.helpers import AlertsTestData
-
-# Create test data with defaults
-alert = AlertsTestData.create_test_alert()
-
-# Create test data with custom values
-alert = AlertsTestData.create_test_alert(
-    alert_id="custom-123",
-    severity="HIGH",
-    status="NEW"
-)
-```
-
 **For libraries without test helpers** (purple_ai, sdl, etc.), use standard mocking patterns:
+
 ```python
-from unittest.mock import AsyncMock, patch
 import pytest
+from unittest.mock import AsyncMock, MagicMock
+from purple_mcp.tools import purple_ai
+from purple_mcp.libs.purple_ai import PurpleAIResultType
 
 @pytest.mark.asyncio
-async def test_purple_ai_success(mock_settings):
+async def test_purple_ai_success(monkeypatch: pytest.MonkeyPatch, mock_settings):
     """Test successful Purple AI query."""
     mock_result = (PurpleAIResultType.MESSAGE, "Test response")
+    mock_ask = AsyncMock(return_value=mock_result)
 
-    with (
-        patch("purple_mcp.tools.purple_ai.get_settings", return_value=mock_settings()),
-        patch("purple_mcp.tools.purple_ai.ask_purple", new_callable=AsyncMock) as mock_ask,
-    ):
-        mock_ask.return_value = mock_result
-        result = await purple_ai("test query")
-        assert result == "Test response"
-        mock_ask.assert_called_once()
+    monkeypatch.setattr(purple_ai, purple_ai.get_settings.__name__, MagicMock(return_value=mock_settings()))
+    monkeypatch.setattr(purple_ai, purple_ai.ask_purple.__name__, mock_ask)
+
+    result = await purple_ai.purple_ai("test query")
+    assert result == "Test response"
+    mock_ask.assert_called_once()
 ```
 
 ### Running Tests
@@ -416,7 +483,9 @@ uv run --group test pytest tests/unit/tools/test_purple_ai.py::test_specific_fun
 uv run --group test pytest -n auto --cov=src/purple_mcp --cov-report=html
 ```
 
-**Important**: Use `pytest-xdist` (`-n auto`) for running multiple tests in parallel, but **do not use it** when running a single test or test function. Running a single test with xdist adds unnecessary overhead.
+**Important**: Use `pytest-xdist` (`-n auto`) for running multiple tests in parallel, but **do not
+use it** when running a single test or test function. Running a single test with xdist adds
+unnecessary overhead.
 
 ### Test Requirements
 
@@ -435,10 +504,10 @@ uv run --group test pytest -n auto --cov=src/purple_mcp --cov-report=html
 uv run ruff format
 
 # 2. Run linting and auto-fix
-uv run ruff check --fix
+uv run ruff check . --fix
 
 # 3. Run type checking (IMPORTANT: always run on full project, not individual files)
-uv run mypy
+uv run mypy src tests
 
 # 4. Run tests
 uv run --group test pytest -n auto
@@ -446,7 +515,8 @@ uv run --group test pytest -n auto
 # All checks must pass ✅
 ```
 
-**Note**: When running `mypy`, always run it on the entire project scope rather than individual files to ensure consistent type checking across all modules.
+**Note**: When running `mypy`, always run it on the entire project scope rather than individual
+files to ensure consistent type checking across all modules.
 
 ### Adding Dependencies
 
@@ -456,10 +526,8 @@ uv add package-name
 
 # ❌ WRONG: Don't use these
 uv pip install package-name  # WRONG
-pip install package-name      # WRONG
+pip install package-name     # WRONG
 ```
-
-`uv pip` in only allowed in the validate_submodules.py script.
 
 ### Creating a New Feature
 
@@ -510,7 +578,8 @@ except SDLQueryError as e:
 
 ### Configuration Patterns
 
-Library configuration classes should use `_ProgrammaticSettings` to disable environment variable loading:
+Library configuration classes should use `_ProgrammaticSettings` to disable environment variable
+loading:
 
 ```python
 # ✅ CORRECT: Library config that only accepts programmatic initialization
@@ -561,6 +630,7 @@ class MyLibConfig(_ProgrammaticSettings):
 ```
 
 **Why `_ProgrammaticSettings`?**
+
 - Ensures library configs are **explicit** and never read from environment variables
 - Prevents accidental coupling to global environment state
 - Makes libraries fully testable and reusable outside MCP context
@@ -590,7 +660,7 @@ async def fetch_data(url: str, token: str) -> dict[str, Any]:
 ```bash
 # Problem: ModuleNotFoundError: No module named 'purple_mcp'
 # Solution: Install project with dependencies
-uv sync --group dev --group test
+uv sync --all-groups
 ```
 
 ### Type Checking Fails
@@ -598,7 +668,7 @@ uv sync --group dev --group test
 ```bash
 # Problem: mypy reports errors
 # Solution: Add proper type hints and run mypy
-uv run mypy
+uv run mypy src tests
 
 # Check specific file
 uv run mypy src/purple_mcp/libs/my_module.py
@@ -625,7 +695,8 @@ uv run --group test pytest tests/unit/test_config.py -v
 3. **Type Everything**: Strict type hints required (`mypy` strict mode)
 4. **Security Conscious**: HTTPS required, no secrets in code, validate inputs
 5. **Test Comprehensively**: Unit tests + integration tests required
-6. **Document Thoroughly**: Google-style docstrings for all public functions, never reference test counts
+6. **Document Thoroughly**: Google-style docstrings for all public functions, never reference test
+   counts
 7. **Use uv**: Always use `uv add`, never `pip install`
 8. **Run mypy broadly**: Always run `mypy` on the full project, not individual files
 9. **Use xdist wisely**: Use `-n auto` for multiple tests, but not for single test execution
@@ -635,7 +706,7 @@ uv run --group test pytest tests/unit/test_config.py -v
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Comprehensive contribution guide
 - [README.md](README.md) - Project overview and setup
 - [SECURITY.md](SECURITY.md) - Security guidelines
-- [Python 3.10+ Docs](https://docs.python.org/3.10/)
+- [Python 3.11+ Docs](https://docs.python.org/3.11/)
 - [uv Documentation](https://docs.astral.sh/uv/)
 - [Pydantic Documentation](https://docs.pydantic.dev/)
 

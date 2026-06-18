@@ -9,8 +9,8 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from purple_mcp.libs.sdl import SDLQueryClient, create_sdl_settings
-from purple_mcp.libs.sdl.config import SDLSettings
+from purple_mcp.libs.sdl.config import SDLSettings, create_sdl_settings
+from purple_mcp.libs.sdl.sdl_query_client import SDLQueryClient
 
 
 @pytest.fixture

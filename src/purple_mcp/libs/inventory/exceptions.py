@@ -55,9 +55,12 @@ class InventoryClientError(InventoryError):
 
 
 class InventoryNotFoundError(InventoryClientError):
-    """Exception raised when an inventory item is not found."""
+    """Exception raised when an inventory item is not found (HTTP 404).
 
-    pass
+    Note: A 404 response from the Inventory API typically indicates a misconfiguration
+    (wrong endpoint, unavailable feature) rather than "no results found". The API
+    returns HTTP 200 with empty data when a query yields no results.
+    """
 
 
 class InventoryAuthenticationError(InventoryClientError):

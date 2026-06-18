@@ -20,7 +20,7 @@ jobs:
     if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
       fail-fast: false
     runs-on: ubuntu-latest
 
@@ -37,7 +37,7 @@ jobs:
           # Start the server in stdio mode and send a simple MCP initialize request
           # The server should respond with an initialize response and then we send initialized notification
           set +e
-          (sleep 2 && echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test-client", "version": "1.0.0"}}}' && sleep 1 && echo '{"jsonrpc": "2.0", "method": "notifications/initialized"}' && sleep 1) | timeout 20 uv run --python=${{ matrix.python-version }} purple-mcp --mode stdio
+          (sleep 2 && echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test-client", "version": "1.0.0"}}}' && sleep 1 && echo '{"jsonrpc": "2.0", "method": "notifications/initialized"}' && sleep 1) | timeout 30 uv run --python=${{ matrix.python-version }} purple-mcp --mode stdio
           exit_code=$?
           set -e
 
@@ -61,7 +61,7 @@ jobs:
           SERVER_PID=$!
 
           # Give the server time to start (longer for Python 3.14 due to potential builds)
-          sleep 20
+          sleep 30
 
           # Check if server is still running
           if ! kill -0 $SERVER_PID 2>/dev/null; then
@@ -90,7 +90,7 @@ jobs:
           SERVER_PID=$!
 
           # Give the server time to start (longer for Python 3.14 due to potential builds)
-          sleep 20
+          sleep 30
 
           # Check if server is still running
           if ! kill -0 $SERVER_PID 2>/dev/null; then

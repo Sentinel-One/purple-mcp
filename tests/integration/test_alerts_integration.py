@@ -12,14 +12,16 @@ import json
 import logging
 
 import pytest
+import pytest_asyncio
 from fastmcp import Client
 
 from purple_mcp.config import get_settings
 from purple_mcp.libs.alerts import (
     AlertsClient,
-    AlertsClientError,
     AlertsConfig,
     AlertsGraphQLError,
+    EqualFilterBooleanInput,
+    FilterInput,
     ViewType,
 )
 from purple_mcp.server import app
@@ -39,6 +41,9 @@ def real_alerts_config(integration_env_check: dict[str, str]) -> AlertsConfig:
     """Create a real alerts configuration from environment variables."""
     settings = get_settings()
 
+    # Ensure required credentials are not None for integration tests
+    assert settings.graphql_service_token is not None
+
     return AlertsConfig(
         graphql_url=settings.alerts_graphql_url,
         auth_token=settings.graphql_service_token,
@@ -46,15 +51,58 @@ def real_alerts_config(integration_env_check: dict[str, str]) -> AlertsConfig:
     )
 
 
+@pytest_asyncio.fixture
+async def alerts_client(real_alerts_config: AlertsConfig) -> AlertsClient:
+    """Create a live AlertsClient for integration testing."""
+    client = AlertsClient(real_alerts_config)
+    return client
+
+
+@pytest_asyncio.fixture
+async def valid_alert_id(alerts_client: AlertsClient) -> str:
+    """Get a valid alert ID for testing.
+
+    Args:
+        alerts_client: AlertsClient instance
+
+    Returns:
+        Alert ID for the first listed alert
+
+    Raises:
+        RuntimeError, if no valid alerts returned
+    """
+    connection = await alerts_client.list_alerts(first=1, view_type=ViewType.ALL)
+    if connection and connection.edges:
+        return str(connection.edges[0].node.id)
+    raise RuntimeError("No valid alerts found, please check your auth token.")
+
+
+@pytest_asyncio.fixture()
+async def valid_alert_id_with_notes(alerts_client: AlertsClient) -> str:
+    """Get a valid alert ID for testing that also has an alertNote.
+
+    Args:
+        alerts_client: AlertsClient instance
+
+    Returns:
+        Alert ID for the first listed alert
+
+    Raises:
+        RuntimeError, if no valid alerts returned
+    """
+    filter = FilterInput(
+        fieldId="alertNoteExists", booleanEqual=EqualFilterBooleanInput(value=True)
+    )
+    connection = await alerts_client.search_alerts(
+        first=1, view_type=ViewType.ALL, filters=[filter]
+    )
+    if connection and connection.edges:
+        return str(connection.edges[0].node.id)
+    raise RuntimeError("No alerts with notes found.")
+
+
 class TestAlertsDirectClient(IntegrationTestBase):
     """Test AlertsClient with real API."""
-
-    @pytest.fixture
-    async def alerts_client(self, real_alerts_config: AlertsConfig) -> AlertsClient:
-        """Create and verify AlertsClient."""
-        client = AlertsClient(real_alerts_config)
-        await self.assert_api_accessible(client)
-        return client
 
     @pytest.mark.asyncio
     async def test_alerts_client_initialization(self, real_alerts_config: AlertsConfig) -> None:
@@ -75,85 +123,83 @@ class TestAlertsDirectClient(IntegrationTestBase):
         )
 
         # Verify response structure
-        self.assert_connection_valid(alerts_connection)
+        assert alerts_connection is not None
+        assert hasattr(alerts_connection, "edges")
+        assert hasattr(alerts_connection, "page_info")
 
-        # If there are alerts, verify their structure
-        if alerts_connection.edges:
-            first_alert = alerts_connection.edges[0].node
-            assert first_alert.id is not None
-            assert first_alert.severity is not None
-            assert first_alert.status is not None
-            assert first_alert.name is not None
-            assert first_alert.detected_at is not None
+        assert len(alerts_connection.edges) > 0
+
+        # Verify alert-node structure
+        first_alert = alerts_connection.edges[0].node
+        assert first_alert.id is not None
+        assert first_alert.severity is not None
+        assert first_alert.status is not None
+        assert first_alert.name is not None
+        assert first_alert.detected_at is not None
 
     @pytest.mark.asyncio
     async def test_search_alerts_with_filters(self, alerts_client: AlertsClient) -> None:
         """Test searching alerts with filters against real API."""
-        # Use filter helper to create filters
-        filters = FilterTestHelper.create_severity_filters(["HIGH", "CRITICAL"])
+        # arrange
+        filters = [FilterInput.create_string_in("severity", ["HIGH", "CRITICAL"])]
+        expected_field_values = {"severity": {"HIGH", "CRITICAL"}}
 
-        # Search with filters
-        await alerts_client.search_alerts(filters=filters, first=10, view_type=ViewType.ALL)
-
-        # Verify using helper
-        await FilterTestHelper.verify_filter_results(
-            alerts_client, filters, "severity", {"HIGH", "CRITICAL"}, sample_size=10
+        # act
+        alert_results = await alerts_client.search_alerts(
+            filters=filters, first=10, view_type=ViewType.ALL
         )
 
+        # assert
+        for alert_edge in alert_results.edges:
+            alert_dict = alert_edge.node.model_dump()
+            for field, acceptable_values in expected_field_values.items():
+                assert field in alert_dict
+                assert alert_dict[field] in acceptable_values
+
     @pytest.mark.asyncio
-    async def test_get_specific_alert(self, alerts_client: AlertsClient) -> None:
+    async def test_get_specific_alert(
+        self, alerts_client: AlertsClient, valid_alert_id: str
+    ) -> None:
         """Test getting a specific alert by ID."""
-        # Get a test alert ID
-        alert_id = await self.get_test_alert_id(alerts_client)
+        alert_id = valid_alert_id
 
-        if alert_id:
-            # Get the specific alert
-            alert = await alerts_client.get_alert(alert_id)
+        # Get the specific alert
+        alert = await alerts_client.get_alert(alert_id)
 
-            assert alert is not None
-            assert alert.id == alert_id
-            assert alert.severity is not None
-            assert alert.status is not None
-        else:
-            pytest.skip("No alerts available for testing")
+        assert alert is not None
+        assert alert.id == alert_id
+        assert alert.severity is not None
+        assert alert.status is not None
 
     @pytest.mark.asyncio
-    async def test_get_alert_notes(self, alerts_client: AlertsClient) -> None:
+    async def test_get_alert_notes(
+        self, alerts_client: AlertsClient, valid_alert_id_with_notes: str
+    ) -> None:
         """Test getting alert notes."""
-        # Get a test alert ID
-        alert_id = await self.get_test_alert_id(alerts_client)
+        # Get notes for the alert
+        notes_response = await alerts_client.get_alert_notes(alert_id=valid_alert_id_with_notes)
 
-        if alert_id:
-            # Get notes for the alert
-            notes_response = await alerts_client.get_alert_notes(alert_id=alert_id)
-
-            # Verify response structure
-            assert hasattr(notes_response, "data")
-
-            # If there are notes, verify their structure
-            if notes_response.data:
-                first_note = notes_response.data[0]
-                assert first_note.id is not None
-                assert first_note.text is not None
-                assert first_note.created_at is not None
-        else:
-            pytest.skip("No alerts available for testing")
-
-            pytest.skip("No alerts available for testing")
+        # Verify response structure
+        assert hasattr(notes_response, "data")
+        assert notes_response.data
+        first_note = notes_response.data[0]
+        assert first_note.id is not None
+        assert first_note.text is not None
+        assert first_note.created_at is not None
 
     @pytest.mark.asyncio
     async def test_error_handling_invalid_alert_id(self, alerts_client: AlertsClient) -> None:
-        """Test error handling with invalid alert ID."""
-        # Test with obviously invalid ID
+        """Test with obviously invalid (not conforming to UUID) alert ID."""
         invalid_id = "invalid-alert-id-12345"
+        with pytest.raises(AlertsGraphQLError, match=r"could not be parsed into a UUID"):
+            await alerts_client.get_alert(invalid_id)
 
-        try:
-            result = await alerts_client.get_alert(invalid_id)
-            # Some APIs might return None instead of error
-            assert result is None
-        except (AlertsClientError, AlertsGraphQLError) as e:
-            # Error is expected
-            assert "not found" in str(e).lower() or "invalid" in str(e).lower()
+    @pytest.mark.asyncio
+    async def test_error_handling_missing_alert_id(self, alerts_client: AlertsClient) -> None:
+        """Test error handling with plausible-but-actually-not-present alert ID."""
+        invalid_id = "0123a4bc-53df-7a54-878f-0abc12345d67"
+        with pytest.raises(AlertsGraphQLError, match=r"Required value was null"):
+            await alerts_client.get_alert(invalid_id)
 
     @pytest.mark.asyncio
     async def test_pagination_functionality(self, alerts_client: AlertsClient) -> None:
@@ -169,40 +215,31 @@ class TestAlertsDirectClient(IntegrationTestBase):
             max_pages=3,
         )
 
-        # Skip if no alerts are available
-        if results["total_items"] == 0:
-            pytest.skip("No alerts available for pagination testing")
-
+        # Check if ANY results were returned
+        assert results["total_items"] > 0
         # Verify pagination worked correctly
         assert results["page_count"] > 0
         assert results["total_items"] == results["cursors_seen"]
-
-        # No duplicate cursors
-        assert results["cursors_seen"] == results["total_items"]
 
 
 class TestAlertsMCPTools(IntegrationTestBase):
     """Integration tests for alerts tools via MCP."""
 
     @pytest.mark.asyncio
-    async def test_get_alert_tool(self, integration_env_check: dict[str, str]) -> None:
+    async def test_get_alert_tool(self, valid_alert_id: str) -> None:
         """Test get_alert tool with real API."""
-        # Get a test alert ID first
-        client = alerts._get_alerts_client()
-        alert_id = await self.get_test_alert_id(client)
+        # Use the tool
+        result = await alerts.get_alert(valid_alert_id)
 
-        if alert_id:
-            # Use the tool
-            result = await alerts.get_alert(alert_id)
-
-            # Verify JSON response
-            data = json.loads(result)
-            assert data is not None
-            assert data["id"] == alert_id
-            assert "severity" in data
-            assert "status" in data
-        else:
-            pytest.skip("No alerts available for testing")
+        # Verify JSON response
+        data = json.loads(result)
+        assert data is not None
+        assert data["id"] == valid_alert_id
+        assert "severity" in data
+        assert "status" in data
+        # check for camelCasing, need a field we expect to always be present:
+        # 'detectedAt' is specified as non-optional by the GQL schema.
+        assert "detectedAt" in data
 
     @pytest.mark.asyncio
     async def test_search_alerts_tool_with_filters(
@@ -210,41 +247,32 @@ class TestAlertsMCPTools(IntegrationTestBase):
     ) -> None:
         """Test search_alerts tool with filters."""
         # Try multiple filter combinations to increase chances of finding alerts
-        filter_attempts = [
-            [{"fieldId": "severity", "filterType": "string_equals", "value": "HIGH"}],
-            [{"fieldId": "severity", "filterType": "string_equals", "value": "MEDIUM"}],
-            [{"fieldId": "severity", "filterType": "string_equals", "value": "LOW"}],
-            [{"fieldId": "severity", "filterType": "string_equals", "value": "CRITICAL"}],
-            # Try without filters to get any alerts
-            [],
+        # arrange
+        severity_values = ["HIGH", "MEDIUM", "LOW", "CRITICAL"]
+        filters = [
+            {"fieldId": "severity", "filterType": "string_in", "values": severity_values},
         ]
 
-        data = None
-        used_filters = None
+        # act
+        result = await alerts.search_alerts(filters=json.dumps(filters), first=20)
+        data = json.loads(result)
 
-        for filters in filter_attempts:
-            result = await alerts.search_alerts(filters=json.dumps(filters), first=20)
-            data = json.loads(result)
-
-            # Verify JSON response structure
-            assert isinstance(data, dict)
-            assert "edges" in data
-            assert "page_info" in data
-
-            if data["edges"]:
-                used_filters = filters
-                break
-
-        # Skip if no alerts found with any filter combination
+        # Verify JSON response structure
         assert data is not None  # Loop always executes since filter_attempts is not empty
-        if not data.get("edges"):
-            pytest.skip("No alerts available for testing")
+        assert isinstance(data, dict)
+        assert "edges" in data
+        assert "pageInfo" in data
 
+        assert len(data["edges"]) > 0
         # Verify filter was applied correctly (only if filters were used)
-        if used_filters:
-            for edge in data["edges"]:
-                if "severity" in edge["node"]:
-                    assert edge["node"]["severity"] == used_filters[0]["value"]
+        for edge in data["edges"]:
+            assert "node" in edge
+            node = edge["node"]
+            if "severity" in node:
+                assert node["severity"] in severity_values
+            # check for camelCasing, need a field we expect to always be present:
+            # 'detectedAt' is specified as non-optional by the GQL schema.
+            assert "detectedAt" in node
 
     @pytest.mark.asyncio
     async def test_tools_parameter_validation(self, integration_env_check: dict[str, str]) -> None:
@@ -257,17 +285,15 @@ class TestAlertsMCPTools(IntegrationTestBase):
         with pytest.raises(ValueError, match="view_type must be one of"):
             await alerts.list_alerts(view_type="INVALID")
 
-        # Test empty note text
-
 
 class TestAlertsPerformance(IntegrationTestBase):
     """Performance tests for alerts functionality."""
 
     @pytest.mark.asyncio
     @pytest.mark.alerts_performance
-    async def test_concurrent_requests(self, real_alerts_config: AlertsConfig) -> None:
+    async def test_concurrent_requests(self, alerts_client: AlertsClient) -> None:
         """Test concurrent requests performance."""
-        client = AlertsClient(real_alerts_config)
+        client = alerts_client
         perf_helper = PerformanceTestHelper()
 
         # Define concurrent operations
@@ -336,9 +362,9 @@ class TestAlertsPerformance(IntegrationTestBase):
 
     @pytest.mark.asyncio
     @pytest.mark.alerts_performance
-    async def test_large_pagination_performance(self, real_alerts_config: AlertsConfig) -> None:
+    async def test_large_pagination_performance(self, alerts_client: AlertsClient) -> None:
         """Test performance with large page sizes."""
-        client = AlertsClient(real_alerts_config)
+        client = alerts_client
         perf_helper = PerformanceTestHelper()
 
         page_sizes = [10, 25, 50, 100]
@@ -395,7 +421,7 @@ class TestAlertsMCPServer(IntegrationTestBase):
             assert result.content[0].type == "text"
             data = json.loads(result.content[0].text)
             assert "edges" in data
-            assert "page_info" in data
+            assert "pageInfo" in data
 
     @pytest.mark.asyncio
     async def test_alerts_tools_error_handling_via_mcp(

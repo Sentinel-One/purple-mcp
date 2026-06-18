@@ -11,15 +11,19 @@ wheels/
 .DS_Store
 .idea
 /.env
+/.envrc
 /settings.json
 /.env.test
+/.env.evals
 /.coverage
 /coverage.xml
+.envrc
 
-# SSL and production files
+# SSL and release environment files
 /ssl/
 *.pem
 *.key
 *.crt
+.env.release
 .env.production
 .env.local

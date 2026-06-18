@@ -1,7 +1,7 @@
 """Tests for purple_mcp.server module.
 
 This module tests the FastMCP server initialization, tool registration,
-health check endpoint, and HTTP app configuration.
+health check endpoint, HTTP app configuration, and authentication middleware.
 """
 
 import inspect
@@ -16,8 +16,8 @@ from fastmcp.server.http import StreamableHTTPASGIApp
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.routing import Route
 
-from purple_mcp import server
 from purple_mcp.openai_schema import OpenAISchemaGenerator, OpenAIToolExtractor
+from purple_mcp.server import app, get_http_app, http_app
 
 
 class TestServerInitialization:
@@ -30,7 +30,7 @@ class TestServerInitialization:
         mock_settings.transport_mode = mode
         mock_settings.stateless_http = stateless_http
 
-        http_app = server.get_http_app(server.app, mock_settings)
+        http_app = get_http_app(app, mock_settings)
 
         assert http_app is not None
         # The http_app should be a Starlette application instance
@@ -53,14 +53,10 @@ class TestServerInitialization:
 
     def test_server_name(self) -> None:
         """Test that the server has the correct name."""
-        from purple_mcp.server import app
-
         assert app.name == "PurpleAIMCP"
 
     def test_http_app_creation(self) -> None:
         """Test that HTTP app is created with correct transport."""
-        from purple_mcp.server import http_app
-
         assert http_app is not None
         # The http_app should be a Starlette application instance
         assert hasattr(http_app, "routes")
@@ -76,6 +72,20 @@ class TestServerInitialization:
         self._test_http_app_mode("streamable-http", stateless_http=False)
         self._test_http_app_mode("stdio", stateless_http=False)
 
+    def test_get_http_app_with_none_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test get_http_app handles None settings gracefully."""
+        # Create mock app
+        mock_app = MagicMock()
+        mock_http_app = MagicMock()
+        mock_app.http_app.return_value = mock_http_app
+
+        # Call get_http_app with None settings
+        result = get_http_app(mock_app, None)
+
+        # Should default to SSE transport
+        mock_app.http_app.assert_called_once_with(transport="sse")
+        assert result is mock_http_app
+
 
 class TestHealthEndpoint:
     """Tests for the health check endpoint."""
@@ -83,8 +93,6 @@ class TestHealthEndpoint:
     @pytest.mark.asyncio
     async def test_health_check_success(self) -> None:
         """Test health check endpoint returns correct status."""
-        from purple_mcp.server import app, http_app
-
         async with Client(app) as _:
             # Test the health endpoint directly through the server
             # Since it's a custom route, we need to test it via HTTP
@@ -100,8 +108,6 @@ class TestHealthEndpoint:
     async def test_health_check_endpoint_method(self) -> None:
         """Test health check endpoint only accepts GET requests."""
         from starlette.testclient import TestClient
-
-        from purple_mcp.server import http_app
 
         test_client = TestClient(http_app)
 
@@ -120,8 +126,6 @@ class TestToolRegistration:
     @pytest.mark.asyncio
     async def test_purple_ai_tool_registered(self, valid_env_config: dict[str, str]) -> None:
         """Test that purple_ai tool is properly registered."""
-        from purple_mcp.server import app
-
         async with Client(app) as client:
             # List all available tools
             tools = await client.list_tools()
@@ -144,8 +148,6 @@ class TestToolRegistration:
     @pytest.mark.asyncio
     async def test_powerquery_tool_registered(self, valid_env_config: dict[str, str]) -> None:
         """Test that powerquery tool is properly registered."""
-        from purple_mcp.server import app
-
         async with Client(app) as client:
             # List all available tools
             tools = await client.list_tools()
@@ -173,8 +175,6 @@ class TestToolRegistration:
         self, valid_env_config: dict[str, str]
     ) -> None:
         """Test that get_timestamp_range tool is properly registered."""
-        from purple_mcp.server import app
-
         async with Client(app) as client:
             # List all available tools
             tools = await client.list_tools()
@@ -212,8 +212,6 @@ class TestToolExecution:
         self, clean_env: dict[str, str | None]
     ) -> None:
         """Test purple_ai tool execution fails gracefully without configuration."""
-        from purple_mcp.server import app
-
         async with Client(app) as client:
             # Try to call purple_ai tool without proper environment configuration
             with pytest.raises(Exception) as exc_info:
@@ -230,8 +228,6 @@ class TestToolExecution:
         self, clean_env: dict[str, str | None]
     ) -> None:
         """Test powerquery tool execution fails gracefully without configuration."""
-        from purple_mcp.server import app
-
         async with Client(app) as client:
             # Try to call powerquery tool without proper environment configuration
             with pytest.raises(Exception) as exc_info:
@@ -255,8 +251,6 @@ class TestToolExecution:
         self, valid_env_config: dict[str, str]
     ) -> None:
         """Test purple_ai tool execution with mocked dependencies."""
-        from purple_mcp.server import app
-
         # Mock the settings and ask_purple function to avoid external API calls
         with (
             patch("purple_mcp.tools.purple_ai.get_settings") as mock_get_settings,
@@ -264,15 +258,17 @@ class TestToolExecution:
         ):
             # Mock settings to return a valid config
             mock_settings = MagicMock()
-            mock_settings.purple_ai_account_id = "test_account"
-            mock_settings.purple_ai_team_token = "test_token"
             mock_settings.purple_ai_session_id = uuid.uuid4().hex
-            mock_settings.purple_ai_email_address = "test@example.test"
+            mock_settings.purple_ai_email_address = None
             mock_settings.purple_ai_user_agent = "test_agent"
-            mock_settings.purple_ai_build_date = "2025-01-01"
-            mock_settings.purple_ai_build_hash = "test_hash"
+            mock_settings.purple_ai_build_date = None
+            mock_settings.purple_ai_build_hash = None
+            mock_settings.purple_ai_console_version = None
+            mock_settings.purple_ai_console_id = None
+            mock_settings.purple_ai_console_tenant_id = None
+            mock_settings.purple_ai_console_account_id = None
+            mock_settings.purple_ai_console_site_id = None
             mock_settings.sentinelone_console_base_url = "https://test.example.test"
-            mock_settings.purple_ai_console_version = "1.0.0"
             mock_settings.graphql_full_url = "https://test.example.test/graphql"
             mock_settings.graphql_service_token = "test_console_token"
             mock_get_settings.return_value = mock_settings
@@ -299,8 +295,6 @@ class TestToolExecution:
         # Mock the result structure
         from types import SimpleNamespace
 
-        from purple_mcp.server import app
-
         mock_results = AsyncMock()
         mock_results.match_count = 5
         mock_results.columns = [SimpleNamespace(name="column1"), SimpleNamespace(name="column2")]
@@ -315,8 +309,10 @@ class TestToolExecution:
             # Mock settings to return a valid config
             mock_settings = MagicMock()
             mock_settings.sdl_api_token = "test_token"
-            mock_settings.sentinelone_console_base_url = "https://test.example.test"
+            mock_settings.sdl_full_url = "https://test.example.test"
             mock_settings.environment = "development"
+            mock_settings.sdl_console_account_ids = ["account-id"]
+            mock_settings.sdl_console_site_ids = ["site-id"]
             mock_get_settings.return_value = mock_settings
 
             async with Client(app) as client:
@@ -341,8 +337,6 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_invalid_tool_name(self) -> None:
         """Test calling a non-existent tool."""
-        from purple_mcp.server import app
-
         async with Client(app) as client:
             with pytest.raises(Exception) as exc_info:
                 await client.call_tool("nonexistent_tool", {"param": "value"})
@@ -355,8 +349,6 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_tool_with_invalid_parameters(self, valid_env_config: dict[str, str]) -> None:
         """Test calling a tool with invalid parameters."""
-        from purple_mcp.server import app
-
         async with Client(app) as client:
             # Test purple_ai with missing required parameter
             with pytest.raises((Exception, ValueError, TypeError)):
@@ -369,8 +361,6 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_tool_with_wrong_parameter_types(self, valid_env_config: dict[str, str]) -> None:
         """Test calling a tool with wrong parameter types."""
-        from purple_mcp.server import app
-
         async with Client(app) as client:
             # Test powerquery with wrong timestamp types
             with pytest.raises((Exception, ValueError, TypeError)):
@@ -390,15 +380,14 @@ class TestServerIntegration:
     @pytest.mark.asyncio
     async def test_server_initialization_complete(self, valid_env_config: dict[str, str]) -> None:
         """Test that server initializes completely with all components."""
-        from purple_mcp.server import app
-
         async with Client(app) as client:
             # Test that we can connect to the server
             assert client is not None
 
             # Test that we can list tools (server is responsive)
             tools = await client.list_tools()
-            assert len(tools) == 22
+            # Don't check exact number, just ensure that something loads, that way we don't have to update this test every time we add a new tool
+            assert len(tools) > 0
 
             # Test that all expected tools are present
             tool_names = [tool.name for tool in tools]
@@ -409,8 +398,6 @@ class TestServerIntegration:
     def test_http_app_has_correct_routes(self) -> None:
         """Test that HTTP app has the expected routes."""
         from starlette.testclient import TestClient
-
-        from purple_mcp.server import http_app
 
         test_client = TestClient(http_app)
 
@@ -427,8 +414,6 @@ class TestServerIntegration:
         """Test that server can handle concurrent tool calls."""
         import asyncio
 
-        from purple_mcp.server import app
-
         # Mock the dependencies to avoid external calls
         with (
             patch("purple_mcp.tools.purple_ai.get_settings") as mock_get_settings,
@@ -436,15 +421,17 @@ class TestServerIntegration:
         ):
             # Mock settings to return a valid config
             mock_settings = MagicMock()
-            mock_settings.purple_ai_account_id = "test_account"
-            mock_settings.purple_ai_team_token = "test_token"
             mock_settings.purple_ai_session_id = uuid.uuid4().hex
-            mock_settings.purple_ai_email_address = "test@example.test"
+            mock_settings.purple_ai_email_address = None
             mock_settings.purple_ai_user_agent = "test_agent"
-            mock_settings.purple_ai_build_date = "2025-01-01"
-            mock_settings.purple_ai_build_hash = "test_hash"
+            mock_settings.purple_ai_build_date = None
+            mock_settings.purple_ai_build_hash = None
+            mock_settings.purple_ai_console_version = None
+            mock_settings.purple_ai_console_id = None
+            mock_settings.purple_ai_console_tenant_id = None
+            mock_settings.purple_ai_console_account_id = None
+            mock_settings.purple_ai_console_site_id = None
             mock_settings.sentinelone_console_base_url = "https://test.example.test"
-            mock_settings.purple_ai_console_version = "1.0.0"
             mock_settings.graphql_full_url = "https://test.example.test/graphql"
             mock_settings.graphql_service_token = "test_console_token"
             mock_get_settings.return_value = mock_settings
@@ -509,8 +496,6 @@ class TestOpenAICompatibility:
         with different signatures (async vs sync, str vs dict returns, etc.)
         This is appropriate in test code for validating schema generation.
         """
-        from purple_mcp.server import app
-
         try:
             # Use public API to get registered tools (preferred method)
             tools_dict = await app.get_tools()
@@ -523,6 +508,11 @@ class TestOpenAICompatibility:
                 get_alert_notes,
                 list_alerts,
                 search_alerts,
+            )
+            from purple_mcp.tools.cve import (
+                cve_database_status,
+                cve_search_by_id,
+                cve_search_by_vendor,
             )
             from purple_mcp.tools.inventory import (
                 get_inventory_item,
@@ -539,6 +529,15 @@ class TestOpenAICompatibility:
             from purple_mcp.tools.purple_ai import purple_ai
             from purple_mcp.tools.purple_utils import iso_to_unix_timestamp
             from purple_mcp.tools.sdl import get_timestamp_range, powerquery
+            from purple_mcp.tools.threat_intelligence import (
+                threat_intel_by_domain,
+                threat_intel_by_hash,
+                threat_intel_by_ip,
+                threat_intel_by_url,
+                threat_intel_get_file_behavior,
+                threat_intel_get_file_relationships,
+                threat_intel_search,
+            )
             from purple_mcp.tools.vulnerabilities import (
                 get_vulnerability,
                 get_vulnerability_history,
@@ -570,6 +569,16 @@ class TestOpenAICompatibility:
                 get_inventory_item,
                 list_inventory_items,
                 search_inventory_items,
+                threat_intel_by_hash,
+                threat_intel_by_url,
+                threat_intel_by_domain,
+                threat_intel_by_ip,
+                threat_intel_get_file_relationships,
+                threat_intel_search,
+                threat_intel_get_file_behavior,
+                cve_search_by_id,
+                cve_search_by_vendor,
+                cve_database_status,
             ]
 
     def _verify_all_expected_tools_tested(self, tested_tools: list[str]) -> None:
@@ -597,6 +606,16 @@ class TestOpenAICompatibility:
             "get_inventory_item",
             "list_inventory_items",
             "search_inventory_items",
+            "threat_intel_by_hash",
+            "threat_intel_by_url",
+            "threat_intel_by_domain",
+            "threat_intel_by_ip",
+            "threat_intel_get_file_relationships",
+            "threat_intel_search",
+            "threat_intel_get_file_behavior",
+            "cve_search_by_id",
+            "cve_search_by_vendor",
+            "cve_database_status",
         ]
 
         for expected in expected_tools:

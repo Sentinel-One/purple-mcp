@@ -14,11 +14,15 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-def misconfig_config() -> MisconfigurationsConfig:
+def misconfig_config(integration_settings: None) -> MisconfigurationsConfig:
     """Create MisconfigurationsConfig for integration tests."""
     from purple_mcp.config import get_settings
 
     settings = get_settings()
+
+    # Ensure required credentials are not None for integration tests
+    assert settings.graphql_service_token is not None
+
     return MisconfigurationsConfig(
         graphql_url=settings.misconfigurations_graphql_url,
         auth_token=settings.graphql_service_token,
