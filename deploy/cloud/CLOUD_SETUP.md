@@ -1,16 +1,19 @@
-# Production Setup
+# Cloud Setup
 
-This guide sets up Purple MCP with authentication for production use.
+This guide sets up Purple MCP with authentication for release use.
 
 ## Requirements
 
 **Docker versions:**
+
 - Docker Engine 20.10+ (or Docker Desktop 4.0+)
 - Docker Compose V2 (2.0+)
 
-The production deployment uses security hardening features (`security_opt`, `cap_drop`) that require these minimum versions.
+The release deployments use security hardening features (`security_opt`, `cap_drop`) that require
+these minimum versions.
 
 **Verify your versions:**
+
 ```bash
 docker --version        # Should show 20.10.0+
 docker compose version  # Should show v2.0.0+
@@ -32,7 +35,9 @@ docker compose build
 
 ## Quick Start
 
-> **Note**: This quick start uses nginx for simplicity. For production deployments on AWS, GCP, or Azure, we recommend using native cloud load balancers (ALB, Cloud Load Balancing, or Application Gateway). See [Cloud Load Balancer Setup](#cloud-load-balancer-setup) for configuration details.
+> **Note**: This quick start uses nginx for simplicity. For release deployments on AWS, GCP, or
+> Azure, we recommend using native cloud load balancers (ALB, Cloud Load Balancing, or Application
+> Gateway). See [Cloud Load Balancer Setup](#cloud-load-balancer-setup) for configuration details.
 
 ### 1. Generate credentials and token
 
@@ -42,7 +47,7 @@ cat > .env << EOF
 PURPLEMCP_CONSOLE_TOKEN=your_service_token
 PURPLEMCP_CONSOLE_BASE_URL=https://your-console.sentinelone.net
 PURPLEMCP_AUTH_TOKEN=$(openssl rand -hex 32)
-PURPLEMCP_ENV=production
+PURPLEMCP_ENV=release
 EOF
 
 chmod 600 .env
@@ -50,7 +55,7 @@ chmod 600 .env
 
 ### 2. Generate SSL certificates
 
-**For testing/staging only (NOT for production):**
+**For testing/staging only (NOT for release environments):**
 
 ```bash
 mkdir -p ssl
@@ -60,9 +65,10 @@ openssl req -x509 -newkey rsa:4096 \
   -subj "/CN=your-domain.com"
 ```
 
-**WARNING: Self-signed certificates above are for development/testing only. Never use self-signed certificates in production deployments.**
+**WARNING: Self-signed certificates above are for development/testing only. Never use self-signed
+certificates in release deployments.**
 
-**For production with Let's Encrypt:**
+**For release deployments with Let's Encrypt:**
 
 ```bash
 docker run --rm -v $(pwd)/ssl:/etc/letsencrypt certbot/certbot \
@@ -76,8 +82,8 @@ cp /etc/letsencrypt/live/your-domain.com/privkey.pem ssl/key.pem
 ### 3. Start the services
 
 ```bash
-# Start with production profile (includes reverse proxy with auth)
-docker compose --profile production up -d
+# Start with release profile (includes reverse proxy with auth)
+docker compose --profile release up -d
 
 # Verify services are running
 docker compose ps
@@ -95,29 +101,40 @@ curl -k -H "Authorization: Bearer $TOKEN" https://localhost/
 
 ## Architecture
 
-This guide covers the nginx reverse proxy setup, which works well for development and self-hosted deployments. For production deployments on AWS, GCP, or Azure, we recommend using your cloud provider's native load balancer (Application Load Balancer, Cloud Load Balancing, or Application Gateway) instead. See [Cloud Load Balancer Setup](#cloud-load-balancer-setup) for details.
+This guide covers the nginx reverse proxy setup, which works well for development and self-hosted
+deployments. For release deployments on AWS, GCP, or Azure, we recommend using your cloud
+provider's native load balancer (Application Load Balancer, Cloud Load Balancing, or Application
+Gateway) instead. See [Cloud Load Balancer Setup](#cloud-load-balancer-setup) for details.
 
 **Nginx architecture:**
+
 ```
 Client → nginx (443) → Purple MCP (8000) → SentinelOne API
 ```
 
 **Cloud load balancer architecture:**
+
 ```
 Client → ALB/GCLB/App Gateway (443) → Purple MCP (8000) → SentinelOne API
 ```
 
-Cloud load balancers provide managed SSL certificates, better DDoS protection, simpler horizontal scaling, and avoid the nginx rate limiting issues described below.
+Cloud load balancers provide managed SSL certificates, better DDoS protection, simpler horizontal
+scaling, and avoid the nginx rate limiting issues described below.
 
 ### How Auth Works
 
-The nginx config uses environment variable substitution. At startup, `envsubst` replaces `${PURPLEMCP_AUTH_TOKEN}` in the template with your actual token from the environment. This means the token is never hardcoded in the config file - it's only in memory at runtime.
+The nginx config uses environment variable substitution. At startup, `envsubst` replaces
+`${PURPLEMCP_AUTH_TOKEN}` in the template with your actual token from the environment. This means
+the token is never hardcoded in the config file - it's only in memory at runtime.
 
 ### Rate Limiting Limitation
 
-The nginx configuration has a known limitation with rate limiting. Due to nginx's request processing phases, authentication failures (401/403 responses) occur before rate limiting is applied. This means an attacker can make unlimited authentication attempts without being throttled.
+The nginx configuration has a known limitation with rate limiting. Due to nginx's request
+processing phases, authentication failures (401/403 responses) occur before rate limiting is
+applied. This means an attacker can make unlimited authentication attempts without being throttled.
 
-**Mitigation**: Use a cryptographically strong random token with sufficient entropy. A 256-bit token (32 bytes) makes brute force attacks computationally infeasible even without rate limiting:
+**Mitigation**: Use a cryptographically strong random token with sufficient entropy. A 256-bit
+token (32 bytes) makes brute force attacks computationally infeasible even without rate limiting:
 
 ```bash
 # Recommended: Base64-encoded (URL-safe characters)
@@ -128,12 +145,14 @@ openssl rand -hex 32
 ```
 
 **Token Requirements:**
+
 - Use only base64 or hexadecimal characters (alphanumeric + `/+=` for base64, `0-9a-f` for hex)
 - Minimum 32 bytes of entropy (generates 44+ character base64 or 64 character hex string)
 - It's safe to quote tokens in `.env` files (quotes will be stripped by Docker)
 - Avoid special shell characters that might cause issues: `$`, backticks, `\`, `!` (in some shells)
 
-For deployments requiring rate limiting on authentication failures, consider using a cloud load balancer with WAF rules or moving authentication to the application layer.
+For deployments requiring rate limiting on authentication failures, consider using a cloud load
+balancer with WAF rules or moving authentication to the application layer.
 
 ## Monitoring
 
@@ -167,7 +186,8 @@ curl -k -H "Authorization: Bearer $TOKEN" https://localhost/
 
 ### Verify token is NOT hardcoded
 
-The nginx configuration uses environment variable substitution for security. You can verify the token is properly substituted:
+The nginx configuration uses environment variable substitution for security. You can verify the
+token is properly substituted:
 
 ```bash
 # The template file should contain ${PURPLEMCP_AUTH_TOKEN} placeholder
@@ -189,7 +209,8 @@ The nginx proxy changes health endpoint behavior for security:
 
 - **Backend `/health`** (direct): Publicly accessible, no authentication
 - **Proxy `/health`**: Requires bearer token authentication
-- **Proxy `/internal/health`**: IP-restricted to internal networks only (localhost IPv4 `127.0.0.1`, localhost IPv6 `::1`, and Docker bridge networks `172.16.0.0/12`)
+- **Proxy `/internal/health`**: IP-restricted to internal networks only (localhost IPv4
+  `127.0.0.1`, localhost IPv6 `::1`, and Docker bridge networks `172.16.0.0/12`)
 
 Docker health checks use the IP-restricted `/internal/health` endpoint. For external monitoring:
 
@@ -230,7 +251,7 @@ docker compose restart purple-mcp-proxy
 
 ### Renew self-signed certificate (testing only)
 
-**WARNING: Self-signed certificates are for testing only, not production.**
+**WARNING: Self-signed certificates are for testing only, not release deployments.**
 
 ```bash
 openssl req -x509 -newkey rsa:4096 \
@@ -291,16 +312,19 @@ docker compose logs purple-mcp-streamable-http
 
 ### Environment Variables
 
-See [docker-compose.yml](docker-compose.yml) for a complete list. Key production variables:
+See [docker-compose.yml](../../docker-compose.yml) for a complete list. Key release environment
+variables:
 
 - `PURPLEMCP_AUTH_TOKEN` - Bearer token for proxy authentication (required)
 - `PURPLEMCP_CONSOLE_TOKEN` - SentinelOne service user token
 - `PURPLEMCP_CONSOLE_BASE_URL` - SentinelOne console URL
-- `PURPLEMCP_ENV` - Set to `production`
+- `PURPLEMCP_ENV` - Set to `release`
 
 ### Nginx Configuration
 
-See [deploy/nginx/nginx.conf.template](deploy/nginx/nginx.conf.template) for the reverse proxy configuration template. The template uses `envsubst` to inject `PURPLEMCP_AUTH_TOKEN` at runtime. Notable features:
+See [deploy/nginx/nginx.conf.template](../nginx/nginx.conf.template) for the reverse proxy
+configuration template. The template uses `envsubst` to inject `PURPLEMCP_AUTH_TOKEN` at runtime.
+Notable features:
 
 - Bearer token validation (`Authorization: Bearer <token>`)
 - HTTPS/TLS with modern ciphers
@@ -311,23 +335,29 @@ See [deploy/nginx/nginx.conf.template](deploy/nginx/nginx.conf.template) for the
 
 ### Security Hardening
 
-The production profile (`docker compose --profile production`) includes security hardening:
+The release profile (`docker compose --profile release`) includes security hardening:
 
 - **`no-new-privileges:true`**: Prevents privilege escalation within containers
 - **`cap_drop: ALL`**: Drops all Linux capabilities; services run with minimal privileges
 - **Read-only volumes**: Configuration and SSL certificates mounted as read-only
 
-These settings follow the principle of least privilege. The containers can still function normally for their intended purpose (running Python/nginx) but cannot perform privileged operations.
+These settings follow the principle of least privilege. The containers can still function normally
+for their intended purpose (running Python/nginx) but cannot perform privileged operations.
 
 ## Cloud Load Balancer Setup
 
-Purple MCP uses Server-Sent Events (SSE) for streaming responses, which requires long-lived HTTP connections. The critical configuration across all cloud providers is the idle timeout - default values are typically too short and will cause connections to drop.
+Purple MCP uses Server-Sent Events (SSE) for streaming responses, which requires long-lived HTTP
+connections. The critical configuration across all cloud providers is the idle timeout - default
+values are typically too short and will cause connections to drop.
 
-Purple MCP runs in stateless mode, meaning each request is independent and session state is not maintained. This simplifies deployment: you don't need sticky sessions or session affinity, and you can scale horizontally by adding more backend instances without coordination between them.
+Purple MCP runs in stateless mode, meaning each request is independent and session state is not
+maintained. This simplifies deployment: you don't need sticky sessions or session affinity, and you
+can scale horizontally by adding more backend instances without coordination between them.
 
 ### AWS Application Load Balancer
 
-The default ALB idle timeout of 60 seconds will cause SSE connections to fail. Increase it to at least 300 seconds (5 minutes) or higher depending on your use case:
+The default ALB idle timeout of 60 seconds will cause SSE connections to fail. Increase it to at
+least 300 seconds (5 minutes) or higher depending on your use case:
 
 ```hcl
 resource "aws_lb" "purple_mcp" {
@@ -357,13 +387,18 @@ resource "aws_lb_target_group" "purple_mcp" {
 }
 ```
 
-Configure your HTTPS listener to forward to this target group and attach an SSL certificate from ACM. For authentication, you can implement token validation in the application layer or use AWS WAF rules.
+Configure your HTTPS listener to forward to this target group and attach an SSL certificate from
+ACM. For authentication, you can implement token validation in the application layer or use AWS WAF
+rules.
 
-Reference: [AWS Guidance for Deploying MCP Servers](https://aws.amazon.com/solutions/guidance/deploying-model-context-protocol-servers-on-aws/)
+Reference:
+[AWS Guidance for Deploying MCP Servers](https://aws.amazon.com/solutions/guidance/deploying-model-context-protocol-servers-on-aws/)
 
 ### Google Cloud Load Balancing
 
-The default 30 second backend timeout is too short for SSE connections. Set it significantly higher - 24 hours (86400 seconds) works well:
+The default 30 second backend timeout is too short for SSE connections. Set it significantly
+higher - 24 hours (86400 seconds) works well:
+
 ```hcl
 resource "google_compute_backend_service" "purple_mcp" {
   name        = "purple-mcp-backend"
@@ -390,11 +425,14 @@ resource "google_compute_health_check" "purple_mcp" {
 }
 ```
 
-Session affinity is set to `NONE` since Purple MCP doesn't maintain session state. For additional security, consider using Cloud Armor for DDoS protection and WAF capabilities.
+Session affinity is set to `NONE` since Purple MCP doesn't maintain session state. For additional
+security, consider using Cloud Armor for DDoS protection and WAF capabilities.
 
 ### Azure Application Gateway / Load Balancer
 
-Azure enforces a 4 minute minimum idle timeout, which is the bare minimum for SSE. Configure a higher value if your deployment allows:
+Azure enforces a 4 minute minimum idle timeout, which is the bare minimum for SSE. Configure a
+higher value if your deployment allows:
+
 ```hcl
 resource "azurerm_lb" "purple_mcp" {
   name                = "purple-mcp-lb"
@@ -416,13 +454,17 @@ resource "azurerm_lb_probe" "purple_mcp" {
 }
 ```
 
-Session persistence is not required since Purple MCP operates in stateless mode. If the 4 minute timeout proves insufficient, implement client-side keepalives (sending data every 3 minutes) to maintain the connection.
+Session persistence is not required since Purple MCP operates in stateless mode. If the 4 minute
+timeout proves insufficient, implement client-side keepalives (sending data every 3 minutes) to
+maintain the connection.
 
-For enhanced security, use Azure WAF with Application Gateway or integrate Azure AD for OAuth 2.0 authentication.
+For enhanced security, use Azure WAF with Application Gateway or integrate Azure AD for OAuth 2.0
+authentication.
 
 ### Kubernetes Deployments
 
-If you're running Purple MCP on EKS, GKE, or AKS, configure health probes in your deployment manifest:
+If you're running Purple MCP on EKS, GKE, or AKS, configure health probes in your deployment
+manifest:
 
 ```yaml
 livenessProbe:
@@ -440,12 +482,16 @@ readinessProbe:
   periodSeconds: 10
 ```
 
-Purple MCP operates in stateless mode by default, making it well-suited for Kubernetes deployments. You can enable horizontal pod autoscaling to handle varying loads, and the load balancer will distribute requests across pods without requiring session affinity.
+Purple MCP operates in stateless mode by default, making it well-suited for Kubernetes deployments.
+You can enable horizontal pod autoscaling to handle varying loads, and the load balancer will
+distribute requests across pods without requiring session affinity.
 
 ## Pre-launch Checklist
 
 **For cloud load balancer deployments (recommended):**
-- [ ] Idle timeout configured appropriately (300+ seconds for AWS, 86400 seconds for GCP, 240+ seconds for Azure)
+
+- [ ] Idle timeout configured appropriately (300+ seconds for AWS, 86400 seconds for GCP, 240+
+      seconds for Azure)
 - [ ] Health checks configured to use `/health` endpoint
 - [ ] SSL/TLS certificate configured (ACM, Google-managed certificates, or Azure certificates)
 - [ ] Auto-scaling enabled for backend instances
@@ -453,17 +499,24 @@ Purple MCP operates in stateless mode by default, making it well-suited for Kube
 - [ ] WAF or Cloud Armor configured for additional security (optional but recommended)
 
 **For nginx reverse proxy deployments:**
-- [ ] Valid SSL certificate installed (not self-signed for production)
-- [ ] Token substitution verified: `docker exec purple-mcp-proxy grep '\${PURPLEMCP_AUTH_TOKEN}' /etc/nginx/nginx.conf` should return nothing (placeholder should be replaced with actual token)
-- [ ] Verify actual token is present: `TOKEN=$(grep PURPLEMCP_AUTH_TOKEN .env | cut -d= -f2) && docker exec purple-mcp-proxy grep "$TOKEN" /etc/nginx/nginx.conf` should find matches
+
+- [ ] Valid SSL certificate installed (not self-signed for release deployment)
+- [ ] Token substitution verified:
+      `docker exec purple-mcp-proxy grep '\${PURPLEMCP_AUTH_TOKEN}' /etc/nginx/nginx.conf` should
+      return nothing (placeholder should be replaced with actual token)
+- [ ] Verify actual token is present:
+      `TOKEN=$(grep PURPLEMCP_AUTH_TOKEN .env | cut -d= -f2) && docker exec purple-mcp-proxy grep "$TOKEN" /etc/nginx/nginx.conf`
+      should find matches
 - [ ] Understanding of rate limiting limitation documented below
 
 **Security:**
+
 - [ ] Strong authentication token generated: `openssl rand -base64 32`
 - [ ] `.env` file excluded from version control
 - [ ] Firewall rules or security groups properly configured
 
 **Operations:**
+
 - [ ] All health checks passing
 - [ ] Authentication tested with both valid and invalid tokens
 - [ ] Monitoring and alerting configured
@@ -471,6 +524,6 @@ Purple MCP operates in stateless mode by default, making it well-suited for Kube
 
 ## Next Steps
 
-- [Docker Deployment Guide](DOCKER.md) - More deployment options
-- [Troubleshooting](DOCKER.md#troubleshooting) - Common issues
-- [Kubernetes Deployment](DOCKER.md#kubernetes-deployment) - Deploy to K8s
+- [Docker Deployment Guide](../docker/DOCKER.md) - More deployment options
+- [Troubleshooting](../docker/DOCKER.md#troubleshooting) - Common issues
+- [Kubernetes Deployment](../docker/DOCKER.md#kubernetes-deployment) - Deploy to K8s

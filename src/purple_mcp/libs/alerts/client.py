@@ -464,7 +464,7 @@ class AlertsClient(GraphQLClientBase[AlertsClientError, AlertsGraphQLError]):
         if filters:
             filter_dicts = cast(
                 list[JsonDict],
-                [filter_input.model_dump(by_alias=True) for filter_input in filters],
+                [filter_input.model_dump() for filter_input in filters],
             )
 
         variables: JsonDict = {

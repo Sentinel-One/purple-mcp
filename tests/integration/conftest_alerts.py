@@ -80,9 +80,9 @@ def alerts_integration_settings(
     """Ensure settings are properly configured for alerts integration tests."""
     # Clear any cached settings from unit tests
     try:
-        from purple_mcp.config import get_settings
+        from purple_mcp.config import _load_base_settings
 
-        get_settings.cache_clear()
+        _load_base_settings.cache_clear()
     except ImportError:
         pass
 
@@ -90,9 +90,9 @@ def alerts_integration_settings(
 
     # Clean up after test
     try:
-        from purple_mcp.config import get_settings
+        from purple_mcp.config import _load_base_settings
 
-        get_settings.cache_clear()
+        _load_base_settings.cache_clear()
     except ImportError:
         pass
 
@@ -108,6 +108,9 @@ def alerts_config(alerts_integration_env_check: dict[str, str]) -> AlertsConfig:
     """Create a real AlertsConfig for integration testing."""
     settings = get_settings()
 
+    # Ensure required credentials are not None for integration tests
+    assert settings.graphql_service_token is not None
+
     return AlertsConfig(
         graphql_url=settings.alerts_graphql_url,
         auth_token=settings.graphql_service_token,
@@ -121,6 +124,9 @@ def alerts_config(alerts_integration_env_check: dict[str, str]) -> AlertsConfig:
 def alerts_config_fallback(alerts_integration_env_check: dict[str, str]) -> AlertsConfig:
     """Create an AlertsConfig with fallback schema support for compatibility testing."""
     settings = get_settings()
+
+    # Ensure required credentials are not None for integration tests
+    assert settings.graphql_service_token is not None
 
     return AlertsConfig(
         graphql_url=settings.alerts_graphql_url,

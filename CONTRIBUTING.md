@@ -1,6 +1,7 @@
 # Contributing to Purple MCP
 
-Thank you for your interest in contributing to the Purple MCP project! This document outlines our development standards, code style, and contribution process.
+Thank you for your interest in contributing to the Purple MCP project! This document outlines our
+development standards, code style, and contribution process.
 
 ## Table of Contents
 
@@ -30,7 +31,7 @@ Purple MCP follows these core principles:
 
 ### Prerequisites
 
-- **Python >=3.10**
+- **Python >=3.11**
 - **uv**: Modern Python package manager (required for dependency management)
 - **Git**: Version control
 
@@ -41,12 +42,8 @@ Purple MCP follows these core principles:
 git clone <repository-url>
 cd purple-mcp
 
-# Initialize Git submodules for source code reference (optional)
-# Contains fastmcp and pydantic-ai source code for reference
-git submodule update --init
-
 # Install all dependencies (development and test)
-uv sync --group dev --group test
+uv sync
 ```
 
 ### Project Structure
@@ -72,33 +69,6 @@ src/purple_mcp/
     ├── vulnerabilities.py     # Vulnerabilities MCP tools
     └── inventory.py           # Inventory MCP tools
 ```
-
-### Git Submodules
-
-The project includes Git submodules for dependency source code reference:
-
-```
-deps/
-├── fastmcp/                   # FastMCP framework source
-└── pydantic-ai/              # Pydantic-AI evaluation framework source
-```
-
-These submodules are **optional** and provide source code for reference during development. They are not required for building or running the project.
-
-To work with submodules:
-
-```bash
-# Initialize and fetch all submodules
-git submodule update --init --recursive
-
-# Update submodules to latest commit
-git submodule update --remote
-
-# Clone including submodules
-git clone --recurse-submodules <repository-url>
-```
-
-**Note**: All submodules use HTTPS URLs for consistent access without SSH keys.
 
 ### Docker
 
@@ -127,23 +97,29 @@ EOF
 docker compose --profile all up
 ```
 
-Note: For production deployments, build the image locally and push to your container registry. See [DOCKER.md](DOCKER.md) for deployment options and [PRODUCTION_SETUP.md](PRODUCTION_SETUP.md) for production with authentication.
+Note: For release deployments, build the image locally and push to your container registry. See
+[DOCKER.md](deploy/docker/DOCKER.md) for deployment options and
+[CLOUD_SETUP.md](deploy/cloud/CLOUD_SETUP.md) for release environment with authentication.
 
 ## Architecture: Tools vs Libraries
 
-Purple MCP follows a strict separation between **libraries** (`libs/`) and **tools** (`tools/`). Understanding this distinction is crucial for contributors:
+Purple MCP follows a strict separation between **libraries** (`libs/`) and **tools** (`tools/`).
+Understanding this distinction is crucial for contributors:
 
 ### Libraries (`src/purple_mcp/libs/`)
 
 Libraries are **standalone, reusable components** that implement core business logic:
 
 - **No Global State**: Libraries must not maintain any global configuration objects or singletons
-- **Explicit Configuration**: All configuration must be passed explicitly via constructor parameters or function arguments
-- **Environment-Agnostic**: Libraries should not directly read environment variables or access global settings
+- **Explicit Configuration**: All configuration must be passed explicitly via constructor
+  parameters or function arguments
+- **Environment-Agnostic**: Libraries should not directly read environment variables or access
+  global settings
 - **Testable**: Can be unit tested in isolation without external dependencies
 - **Reusable**: Can be imported and used in any Python project
 
 **Example - Good Library Design**:
+
 ```python
 # ✅ Good: Explicit configuration required
 from purple_mcp.libs.sdl import create_sdl_settings, SDLPowerQueryHandler
@@ -162,6 +138,7 @@ handler = SDLPowerQueryHandler(
 ```
 
 **Example - Bad Library Design**:
+
 ```python
 # ❌ Bad: Using global state or implicit configuration
 from purple_mcp.libs.sdl import handler  # Global instance
@@ -180,23 +157,24 @@ Tools are **MCP interface adapters** that bridge libraries with the MCP protocol
 - **Business Logic Delegation**: Tools delegate actual work to libraries
 
 **Example - Tool Implementation Pattern**:
+
 ```python
 async def my_tool(query: str) -> str:
     # 1. Get global configuration
     settings = get_settings()
-    
+
     # 2. Create explicit library configuration
     lib_config = MyLibConfig(
         api_url=settings.my_service_url,
         auth_token=settings.my_service_token
     )
-    
+
     # 3. Instantiate library with explicit config
     client = MyLibClient(lib_config)
-    
+
     # 4. Delegate to library
     result = await client.perform_operation(query)
-    
+
     # 5. Return MCP-compatible response
     return str(result)
 ```
@@ -243,6 +221,7 @@ class MyLibConfig(_ProgrammaticSettings):
 ```
 
 **Why this pattern?**
+
 - Prevents libraries from reading environment variables
 - Ensures explicit configuration only
 - Makes libraries truly standalone and reusable
@@ -252,7 +231,8 @@ class MyLibConfig(_ProgrammaticSettings):
 
 When implementing new functionality:
 
-1. **Start with the Library**: Implement core logic as a standalone library with explicit configuration
+1. **Start with the Library**: Implement core logic as a standalone library with explicit
+   configuration
 2. **Use `_ProgrammaticSettings`**: Ensure library configs only accept programmatic initialization
 3. **Add the Tool**: Create a thin MCP adapter that uses the library
 4. **Test Separately**: Unit test the library independently, integration test the tool
@@ -262,7 +242,7 @@ When implementing new functionality:
 
 ### Python Standards
 
-- **Target Python >=3.10**
+- **Target Python >=3.11**
 - **Pass mypy strict mode**: All code must pass type checking
 - **Pass ruff checks and formatting**: Code style is enforced
 - **PEP 8 naming conventions**:
@@ -288,20 +268,21 @@ def process_query(query, timeout=30.0):
 - **Google-style docstrings**: Use consistent docstring format
 - **f-strings for formatting**: Prefer f-strings over other formatting methods, except in logging
 - **Comprehensive module docstrings**: Every module should have a detailed docstring
-- **No test counts in docs**: Documentation should never reference test counts as they become outdated
+- **No test counts in docs**: Documentation should never reference test counts as they become
+  outdated
 
 ```python
 # ✅ Good: Google-style docstring
 def submit_query(query: str, timeout: float = 30.0) -> Dict[str, Any]:
     """Submit a query to the Purple AI API.
-    
+
     Args:
         query: The query string to submit
         timeout: Request timeout in seconds
-        
+
     Returns:
         Dict containing the API response
-        
+
     Raises:
         ValueError: If query is empty
         TimeoutError: If request times out
@@ -326,10 +307,10 @@ def validate_token(token: str) -> bool:
     """Validate authentication token."""
     if not token:
         return False
-    
+
     if len(token) < 10:
         return False
-    
+
     return token.startswith("sk-")
 
 # ❌ Bad: Nested conditions
@@ -363,7 +344,7 @@ def authenticate_sdl(token: str) -> None:
     """Authenticate with SDL API."""
     if not token:
         raise SDLAuthenticationError("SDL token is required")
-    
+
     # Authentication logic...
 ```
 
@@ -382,11 +363,11 @@ def authenticate_sdl(token: str) -> None:
 def validate_tls_config(cls, v: bool) -> bool:
     """Validate TLS configuration with security warnings."""
     if v:
-        # Check for production environment
-        env = os.getenv("PURPLEMCP_ENV", "production").lower()
-        if env in ("production", "prod"):
+        # Check for release environment
+        env = os.getenv("PURPLEMCP_ENV", "release").lower()
+        if env in ("release", "production", "prod"):
             raise ValueError(
-                "TLS verification bypass is FORBIDDEN in production environments"
+                "TLS verification bypass is FORBIDDEN in release environments"
             )
 
         # Issue strong security warning
@@ -424,16 +405,17 @@ Run these commands before committing:
 uv run ruff format
 
 # Run linting and fix issues
-uv run ruff check --fix
+uv run ruff check . --fix
 
-# Run type checking
+# Run type checking (includes src and tests)
 # IMPORTANT: Always run mypy on the full project, not individual files
-uv run mypy
+uv run mypy src tests
 
 # All checks must pass before commits
 ```
 
-**Note**: When running `mypy`, always run it on the entire project scope rather than individual files to ensure consistent type checking across all modules.
+**Note**: When running `mypy`, always run it on the entire project scope rather than individual
+files to ensure consistent type checking across all modules.
 
 ### 3. Development Process
 
@@ -481,14 +463,15 @@ tests/
 
 ### Test Helper Infrastructure
 
-Some libraries (alerts, misconfigurations, vulnerabilities) have comprehensive test helper infrastructure:
+Some libraries (alerts, misconfigurations, vulnerabilities) have comprehensive test helper
+infrastructure:
 
-- **Base test classes**: `AlertsTestBase`, `MisconfigurationsTestBase`, etc.
+- **Base test classes**: `MisconfigurationsTestBase`, etc.
   - `assert_tool_success()`: Test successful tool execution
   - `assert_tool_error()`: Test error handling
   - `assert_tool_validation_error()`: Test parameter validation
 
-- **Mock factory classes**: `MockAlertsClientBuilder`, etc.
+- **Mock factory classes**: `MockMisconfigurationsClientBuilder`, etc.
   - `create_mock()`: Create configured mock clients
   - `create_empty_connection()`: Create empty paginated responses
 
@@ -496,33 +479,6 @@ Some libraries (alerts, misconfigurations, vulnerabilities) have comprehensive t
   - `assert_connection_response()`: Validate paginated responses
   - `assert_alert_response()`: Validate alert data structure
   - `assert_error_message()`: Validate exception messages
-
-- **Test data factories**: `AlertsTestData`, etc.
-  - `create_test_alert()`: Create test Alert objects
-  - `create_test_note()`: Create test Note objects
-
-For libraries without test helpers (purple_ai, sdl, inventory), use standard mocking patterns as shown in examples.
-
-```python
-# ✅ Good: Comprehensive test with mocking
-@pytest.mark.asyncio
-async def test_purple_ai_handles_authentication_error(mock_settings):
-    """Test that Purple AI client handles authentication errors properly."""
-    mock_result = (None, "Authentication failed")
-
-    with (
-        patch("purple_mcp.tools.purple_ai.get_settings", return_value=mock_settings()),
-        patch(
-            "purple_mcp.tools.purple_ai.ask_purple",
-            new_callable=AsyncMock,
-            return_value=mock_result
-        ),
-    ):
-        with pytest.raises(PurpleAIClientError) as exc_info:
-            await purple_ai("test query")
-
-        assert "Purple AI request failed" in str(exc_info.value)
-```
 
 ### Running Tests
 
@@ -544,7 +500,9 @@ uv run --group test pytest tests/unit/tools/test_purple_ai.py::test_specific_fun
 uv run --group test pytest -n auto --cov=src/purple_mcp --cov-report=html
 ```
 
-**Important**: Use `pytest-xdist` (`-n auto`) for running multiple tests in parallel, but **do not use it** when running a single test or test function. Running a single test with xdist adds unnecessary overhead.
+**Important**: Use `pytest-xdist` (`-n auto`) for running multiple tests in parallel, but **do not
+use it** when running a single test or test function. Running a single test with xdist adds
+unnecessary overhead.
 
 #### Serial Execution
 
@@ -573,7 +531,7 @@ uv run --group test pytest --cov=src/purple_mcp --cov-report=html
 
 Every module must have a comprehensive docstring:
 
-```python
+````python
 """SDL Query API Client.
 
 This module provides the HTTP client for interacting with the Singularity Data Lake
@@ -604,13 +562,13 @@ Usage:
 Security:
     This client includes TLS verification bypass capability for development.
     Strong warnings are issued when TLS verification is disabled, and the
-    feature is blocked in production environments.
+    feature is blocked in release environments.
 """
-```
+````
 
 ### Function Documentation
 
-```python
+````python
 def submit_powerquery(
     self,
     query: str,
@@ -618,19 +576,19 @@ def submit_powerquery(
     end_datetime: str,
 ) -> Dict[str, Any]:
     """Submit a PowerQuery to the SDL API.
-    
+
     Args:
         query: The PowerQuery string to execute
         start_datetime: Query start time in ISO 8601 format (e.g., "2024-01-15T10:30:00Z")
         end_datetime: Query end time in ISO 8601 format (e.g., "2024-01-15T11:30:00Z")
-        
+
     Returns:
         Dict containing the query response and metadata
-        
+
     Raises:
         SDLError: If query submission fails
         ValidationError: If parameters are invalid
-        
+
     Example:
         ```python
         result = await client.submit_powerquery(
@@ -640,7 +598,7 @@ def submit_powerquery(
         )
         ```
     """
-```
+````
 
 ## Security Guidelines
 
@@ -653,21 +611,63 @@ def submit_powerquery(
 
 ### TLS and Network Security
 
-- **Require HTTPS by default**: Never use HTTP for production
+- **Require HTTPS by default**: Never use HTTP for release environments
 - **Implement strong TLS warnings**: Make security risks explicit
-- **Block TLS bypass in production**: Prevent dangerous configurations
+- **Block TLS bypass in release environments**: Prevent dangerous configurations
 - **Log security-relevant events**: Monitor for suspicious activity
+
+### Token Logging: Security Best Practices ⚠️
+
+**SECURITY WARNING**: The authentication token is protected by a logging security filter that
+automatically redacts it from logs. However, certain logging patterns can bypass this protection
+and expose sensitive credentials.
+
+**Dangerous Patterns to AVOID:**
+
+```python
+# ❌ WRONG: Logging settings object - may expose tokens
+settings = get_settings()
+logger.debug(f"Settings: {settings.__dict__}")  # DANGEROUS - logs token!
+logger.debug(f"Settings: {repr(settings)}")     # DANGEROUS - logs token!
+logger.debug(f"Config: {vars(settings)}")       # DANGEROUS - logs token!
+
+# ❌ WRONG: String representation of pydantic models containing tokens
+config = PurpleAIConfig(auth_token=settings.graphql_service_token, ...)
+logger.debug(f"Config: {config}")               # DANGEROUS - may log token!
+```
+
+**Safe Patterns:**
+
+```python
+# ✅ CORRECT: Log specific fields that don't contain secrets
+settings = get_settings()
+logger.debug(f"Base URL: {settings.sentinelone_console_base_url}")
+logger.debug(f"Timeout: {settings.http_timeout}")
+
+# ✅ CORRECT: Explicitly avoid sensitive fields
+logger.debug(
+    f"Settings loaded - base_url={settings.sentinelone_console_base_url}, "
+    f"has_token={settings.graphql_service_token is not None}"
+)
+```
+
+**When adding new code:**
+
+1. Never log `settings.__dict__`, `repr(settings)`, `vars(settings)`, or similar
+2. Never log pydantic models that contain auth_token/graphql_service_token fields
+3. Only log specific, non-sensitive configuration values
+4. Use `has_token=bool(settings.graphql_service_token)` instead of logging the token value
 
 ```python
 # ✅ Good: Security-aware TLS configuration
 def _validate_tls_security(self) -> None:
     """Validate TLS configuration with runtime security checks."""
     if self.skip_tls_verify:
-        # Check for production environment
-        env = os.getenv("PURPLEMCP_ENV", "production").lower()
-        if env in ("production", "prod"):
+        # Check for release environment
+        env = os.getenv("PURPLEMCP_ENV", "release").lower()
+        if env in ("release", "production", "prod"):
             raise ValueError(
-                "SECURITY ERROR: TLS verification bypass is FORBIDDEN in production"
+                "SECURITY ERROR: TLS verification bypass is FORBIDDEN in release environments"
             )
 
         # Issue strong runtime warning
@@ -699,24 +699,29 @@ def _validate_tls_security(self) -> None:
 
 ```markdown
 ## Summary
+
 Brief description of the changes and why they're needed.
 
 ## Changes Made
+
 - List of specific changes
 - Include any breaking changes
 - Mention new dependencies
 
 ## Testing
+
 - Describe testing approach
 - Include manual testing steps
 - Note any test coverage changes
 
 ## Security Considerations
+
 - List any security implications
 - Describe mitigation strategies
 - Note any new attack vectors
 
 ## Documentation
+
 - List documentation updates
 - Include any breaking changes to APIs
 - Note any new configuration options
@@ -749,6 +754,32 @@ Brief description of the changes and why they're needed.
 - **Check security**: Look for potential vulnerabilities
 - **Approve when ready**: Don't block unnecessarily
 
+### Security Review Checklist
+
+When reviewing code changes, explicitly verify these security-critical items:
+
+**Token Logging (CRITICAL):**
+
+- [ ] No logging of `settings.__dict__`, `repr(settings)`, or `vars(settings)`
+- [ ] No logging of pydantic models containing `auth_token` or `graphql_service_token` fields
+- [ ] Only specific, non-sensitive fields are logged (e.g., `settings.base_url`,
+      `has_token=bool(...)`)
+- [ ] Rationale: The logging security filter redacts registered tokens, but logging patterns that
+      serialize entire objects may bypass this protection
+
+**Credential Handling:**
+
+- [ ] All tools use `get_settings()` (never `os.getenv()` or direct environment access)
+- [ ] Credentials are validated with `validate_request_credentials()` before use
+- [ ] Type assertions added after validation for mypy
+
+**General Security:**
+
+- [ ] No hardcoded secrets or credentials
+- [ ] HTTPS URLs only (no HTTP)
+- [ ] Input validation on all user-supplied data
+- [ ] Proper error handling without exposing sensitive details
+
 ## Getting Help
 
 - **Check existing issues**: Look for similar problems
@@ -774,4 +805,5 @@ Brief description of the changes and why they're needed.
 
 ## License
 
-By contributing to Purple MCP, you agree that your contributions will be licensed under the same license as the project.
+By contributing to Purple MCP, you agree that your contributions will be licensed under the same
+license as the project.

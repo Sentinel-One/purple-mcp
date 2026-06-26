@@ -14,9 +14,13 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-def alerts_config() -> AlertsConfig:
+def alerts_config(integration_settings: None) -> AlertsConfig:
     """Create AlertsConfig for integration tests."""
     settings = get_settings()
+
+    # Ensure required credentials are not None for integration tests
+    assert settings.graphql_service_token is not None
+
     return AlertsConfig(
         graphql_url=settings.alerts_graphql_url,
         auth_token=settings.graphql_service_token,

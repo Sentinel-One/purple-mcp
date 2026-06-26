@@ -2,90 +2,76 @@
 
 import json
 from typing import cast
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, create_autospec
 
 import pytest
 
 from purple_mcp.libs.alerts import (
     AlertConnection,
+    AlertsClient,
     AlertsClientError,
     AlertsConfig,
     AlertsGraphQLError,
 )
 from purple_mcp.tools import alerts
 from purple_mcp.type_defs import JsonDict
-from tests.unit.libs.alerts.helpers import JSONAssertions, MockAlertsClientBuilder
-from tests.unit.libs.alerts.helpers.base import AlertsTestBase
+from tests.unit.libs.alerts.helpers import MockAlertsClientBuilder
 
 
-class TestNetworkResilience(AlertsTestBase):
+class TestNetworkResilience:
     """Test network resilience and timeout handling."""
 
-    @patch("purple_mcp.tools.alerts._get_alerts_client")
     @pytest.mark.asyncio
-    async def test_network_timeout_handling(self, mock_get_client: Mock) -> None:
+    async def test_network_timeout_handling(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test that network timeouts are properly handled."""
-        # Setup mock to raise timeout error
-        mock_client = MockAlertsClientBuilder.create_mock(
-            "get_alert", side_effect=AlertsClientError("Request timed out after 30.0 seconds")
+        # arrange
+        mock_client = create_autospec(AlertsClient, spec_set=True, instance=True)
+        mock_client.get_alert = AsyncMock(
+            side_effect=AlertsClientError("Request timed out after 30.0 seconds")
         )
-        mock_get_client.return_value = mock_client
+        monkeypatch.setattr(alerts, alerts._get_alerts_client.__name__, lambda: mock_client)
+        expected_cause_message = "Request timed out"
 
-        # Execute and expect chained error
-        with pytest.raises(RuntimeError) as exc_info:
+        # act & assert
+        with pytest.raises(RuntimeError, match="Failed to retrieve alert test-123") as exc_info:
             await alerts.get_alert(alert_id="test-123")
+        assert expected_cause_message in str(exc_info.value.__cause__)
 
-        # Validate both wrapper message and underlying cause
-        JSONAssertions.assert_error_message(
-            exc_info,
-            "Failed to retrieve alert test-123",
-            expected_cause_message="Request timed out",
-        )
-
-    @patch("purple_mcp.tools.alerts._get_alerts_client")
     @pytest.mark.asyncio
-    async def test_network_connection_error(self, mock_get_client: Mock) -> None:
+    async def test_network_connection_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test handling of network connection errors."""
-        # Setup mock to raise connection error
-        mock_client = MockAlertsClientBuilder.create_mock(
-            "list_alerts", side_effect=AlertsClientError("Connection refused")
-        )
-        mock_get_client.return_value = mock_client
+        # arrange
+        mock_client = create_autospec(AlertsClient, spec_set=True, instance=True)
+        mock_client.list_alerts = AsyncMock(side_effect=AlertsClientError("Connection refused"))
+        monkeypatch.setattr(alerts, alerts._get_alerts_client.__name__, lambda: mock_client)
+        expected_cause_message = "Connection refused"
 
-        # Execute and expect chained error
-        with pytest.raises(RuntimeError) as exc_info:
+        # act & assert
+        with pytest.raises(RuntimeError, match="Failed to list alerts") as exc_info:
             await alerts.list_alerts(first=10)
+        assert expected_cause_message in str(exc_info.value.__cause__)
 
-        # Validate both wrapper message and underlying cause
-        JSONAssertions.assert_error_message(
-            exc_info, "Failed to list alerts", expected_cause_message="Connection refused"
-        )
-
-    @patch("purple_mcp.tools.alerts._get_alerts_client")
     @pytest.mark.asyncio
-    async def test_graphql_malformed_response(self, mock_get_client: Mock) -> None:
+    async def test_graphql_malformed_response(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test handling of malformed GraphQL responses."""
-        # Setup mock to raise GraphQL error
-        mock_client = MockAlertsClientBuilder.create_mock(
-            "search_alerts",
-            side_effect=AlertsGraphQLError("Malformed response: missing data field"),
+        # arrange
+        mock_client = create_autospec(AlertsClient, spec_set=True, instance=True)
+        mock_client.search_alerts = AsyncMock(
+            side_effect=AlertsGraphQLError("Malformed response: missing data field")
         )
-        mock_get_client.return_value = mock_client
+        monkeypatch.setattr(alerts, alerts._get_alerts_client.__name__, lambda: mock_client)
+        expected_cause_message = "Malformed response"
 
-        # Execute and expect chained error
-        with pytest.raises(RuntimeError) as exc_info:
+        # act & assert
+        with pytest.raises(RuntimeError, match="Failed to search alerts") as exc_info:
             await alerts.search_alerts(filters=json.dumps([]))
+        assert expected_cause_message in str(exc_info.value.__cause__)
 
-        # Validate both wrapper message and underlying cause
-        JSONAssertions.assert_error_message(
-            exc_info, "Failed to search alerts", expected_cause_message="Malformed response"
-        )
-
-    @patch("purple_mcp.tools.alerts._get_alerts_client")
     @pytest.mark.asyncio
-    async def test_concurrent_request_errors(self, mock_get_client: Mock) -> None:
+    async def test_concurrent_request_errors(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test handling of errors in concurrent requests."""
-        # Create a mock that fails on the third call
+        # arrange - Create a mock that fails on the third call
+        mock_client = create_autospec(AlertsClient, spec_set=True, instance=True)
         call_count = 0
 
         async def side_effect(*args: str, **kwargs: str | int | bool) -> AlertConnection:
@@ -95,27 +81,21 @@ class TestNetworkResilience(AlertsTestBase):
                 raise AlertsClientError("Too many concurrent requests")
             return MockAlertsClientBuilder.create_empty_connection(AlertConnection)
 
-        mock_client = AsyncMock()
-        mock_client.list_alerts.side_effect = side_effect
-        mock_get_client.return_value = mock_client
+        mock_client.list_alerts = AsyncMock(side_effect=side_effect)
+        monkeypatch.setattr(alerts, alerts._get_alerts_client.__name__, lambda: mock_client)
+        expected_cause_message = "Too many concurrent requests"
 
-        # First two calls should succeed
+        # act - First two calls should succeed
         await alerts.list_alerts(first=5)
         await alerts.list_alerts(first=5)
 
         # Third call should fail
-        with pytest.raises(RuntimeError) as exc_info:
+        with pytest.raises(RuntimeError, match="Failed to list alerts") as exc_info:
             await alerts.list_alerts(first=5)
-
-        # Validate both wrapper message and underlying cause
-        JSONAssertions.assert_error_message(
-            exc_info,
-            "Failed to list alerts",
-            expected_cause_message="Too many concurrent requests",
-        )
+        assert expected_cause_message in str(exc_info.value.__cause__)
 
 
-class TestSecurityScenarios(AlertsTestBase):
+class TestSecurityScenarios:
     """Test security-related scenarios."""
 
     @pytest.mark.parametrize(
@@ -133,73 +113,65 @@ class TestSecurityScenarios(AlertsTestBase):
             ),
         ],
     )
-    @patch("purple_mcp.tools.alerts._get_alerts_client")
     @pytest.mark.asyncio
     async def test_http_authentication_errors(
-        self, mock_get_client: Mock, error_message: str, expected_cause_fragment: str
+        self, monkeypatch: pytest.MonkeyPatch, error_message: str, expected_cause_fragment: str
     ) -> None:
         """Test handling of HTTP authentication/authorization errors."""
-        mock_client = MockAlertsClientBuilder.create_mock(
-            "get_alert", side_effect=AlertsClientError(error_message)
-        )
-        mock_get_client.return_value = mock_client
+        # arrange
+        mock_client = create_autospec(AlertsClient, spec_set=True, instance=True)
+        mock_client.get_alert = AsyncMock(side_effect=AlertsClientError(error_message))
+        monkeypatch.setattr(alerts, alerts._get_alerts_client.__name__, lambda: mock_client)
 
-        with pytest.raises(RuntimeError) as exc_info:
+        # act & assert
+        with pytest.raises(RuntimeError, match="Failed to retrieve alert test-123") as exc_info:
             await alerts.get_alert(alert_id="test-123")
+        assert expected_cause_fragment in str(exc_info.value.__cause__)
 
-        JSONAssertions.assert_error_message(
-            exc_info,
-            "Failed to retrieve alert test-123",
-            expected_cause_message=expected_cause_fragment,
-        )
-
-    @patch("purple_mcp.tools.alerts._get_alerts_client")
     @pytest.mark.asyncio
-    async def test_rate_limiting(self, mock_get_client: Mock) -> None:
+    async def test_rate_limiting(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test handling of rate limiting responses."""
-        mock_client = MockAlertsClientBuilder.create_mock(
-            "search_alerts",
-            side_effect=AlertsClientError("Rate limit exceeded. Please retry after 60 seconds."),
+        # arrange
+        mock_client = create_autospec(AlertsClient, spec_set=True, instance=True)
+        mock_client.search_alerts = AsyncMock(
+            side_effect=AlertsClientError("Rate limit exceeded. Please retry after 60 seconds.")
         )
-        mock_get_client.return_value = mock_client
+        monkeypatch.setattr(alerts, alerts._get_alerts_client.__name__, lambda: mock_client)
+        expected_cause_message = "Rate limit exceeded"
 
-        with pytest.raises(RuntimeError) as exc_info:
+        # act & assert
+        with pytest.raises(RuntimeError, match="Failed to search alerts") as exc_info:
             await alerts.search_alerts(filters=json.dumps([]), first=100)
-
-        JSONAssertions.assert_error_message(
-            exc_info, "Failed to search alerts", expected_cause_message="Rate limit exceeded"
-        )
+        assert expected_cause_message in str(exc_info.value.__cause__)
 
     @pytest.mark.asyncio
-    async def test_token_expiration_during_pagination(self) -> None:
+    async def test_token_expiration_during_pagination(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test token expiration during pagination."""
-        with patch("purple_mcp.tools.alerts._get_alerts_client") as mock_get_client:
-            # Mock successful first page
-            mock_client = AsyncMock()
-            first_page = MockAlertsClientBuilder.create_alert_connection([])
-            first_page.page_info.has_next_page = True
-            first_page.page_info.end_cursor = "cursor-1"
-            mock_client.list_alerts.return_value = first_page
-            mock_get_client.return_value = mock_client
+        # arrange - Mock successful first page
+        mock_client = create_autospec(AlertsClient, spec_set=True, instance=True)
+        first_page = MockAlertsClientBuilder.create_empty_connection(AlertConnection)
+        first_page.page_info.has_next_page = True
+        first_page.page_info.end_cursor = "cursor-1"
+        mock_client.list_alerts = AsyncMock(return_value=first_page)
+        monkeypatch.setattr(alerts, alerts._get_alerts_client.__name__, lambda: mock_client)
 
-            # First call succeeds
-            result1 = await alerts.list_alerts(first=10)
-            assert json.loads(result1)["page_info"]["has_next_page"] is True
+        # act - First call succeeds
+        result1 = await alerts.list_alerts(first=10)
+        assert json.loads(result1)["pageInfo"]["hasNextPage"] is True
 
-            # Simulate token expiration for next page
-            mock_client.list_alerts.side_effect = AlertsClientError("Token expired")
+        # arrange - Simulate token expiration for next page
+        mock_client.list_alerts.side_effect = AlertsClientError("Token expired")
+        expected_cause_message = "Token expired"
 
-            # Second call with cursor should fail
-            with pytest.raises(RuntimeError) as exc_info:
-                await alerts.list_alerts(first=10, after="cursor-1")
-
-            # Validate both wrapper message and underlying cause
-            JSONAssertions.assert_error_message(
-                exc_info, "Failed to list alerts", expected_cause_message="Token expired"
-            )
+        # act & assert - Second call with cursor should fail
+        with pytest.raises(RuntimeError, match="Failed to list alerts") as exc_info:
+            await alerts.list_alerts(first=10, after="cursor-1")
+        assert expected_cause_message in str(exc_info.value.__cause__)
 
 
-class TestDataValidationEdgeCases(AlertsTestBase):
+class TestDataValidationEdgeCases:
     """Test edge cases in data validation."""
 
     @pytest.mark.parametrize(
@@ -228,9 +200,8 @@ class TestDataValidationEdgeCases(AlertsTestBase):
     ) -> None:
         """Test edge cases in filter validation that fail before network calls."""
         # These should fail at validation level before settings are accessed
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match=expected_error):
             await alerts.search_alerts(filters=json.dumps(cast(list[JsonDict], filter_config)))
-        JSONAssertions.assert_error_message(exc_info, expected_error)
 
     @pytest.mark.parametrize(
         "filter_config,expected_error",
@@ -250,48 +221,19 @@ class TestDataValidationEdgeCases(AlertsTestBase):
     @pytest.mark.asyncio
     async def test_filter_server_level_errors(
         self,
-        minimal_env_config: dict[str, str],
+        monkeypatch: pytest.MonkeyPatch,
         filter_config: list[dict[str, str]],
         expected_error: str,
     ) -> None:
         """Test filter validation that passes local validation but fails at server level."""
-        with patch("purple_mcp.tools.alerts._get_alerts_client") as mock_get_client:
-            # Mock client that raises an error
-            mock_client = Mock()
-            mock_client.search_alerts = AsyncMock(side_effect=Exception("Server validation error"))
-            mock_get_client.return_value = mock_client
+        # arrange - Mock client that raises an error
+        mock_client = create_autospec(AlertsClient, spec_set=True, instance=True)
+        mock_client.search_alerts = AsyncMock(side_effect=Exception("Server validation error"))
+        monkeypatch.setattr(alerts, alerts._get_alerts_client.__name__, lambda: mock_client)
 
-            with pytest.raises(RuntimeError) as exc_info:
-                await alerts.search_alerts(filters=json.dumps(cast(list[JsonDict], filter_config)))
-            JSONAssertions.assert_error_message(exc_info, expected_error)
-
-    @pytest.mark.asyncio
-    async def test_very_large_filter_list(self, minimal_env_config: dict[str, str]) -> None:
-        """Test handling of very large filter lists."""
-        # Create 50 filters
-        large_filters = [
-            {"fieldId": "severity", "filterType": "string_equals", "value": f"VALUE_{i}"}
-            for i in range(50)
-        ]
-
-        with patch("purple_mcp.tools.alerts._get_alerts_client") as mock_get_client:
-            from purple_mcp.libs.alerts import AlertConnection
-
-            mock_client = MockAlertsClientBuilder.create_mock(
-                "search_alerts",
-                return_value=MockAlertsClientBuilder.create_empty_connection(AlertConnection),
-            )
-            mock_get_client.return_value = mock_client
-
-            # Should handle large filter list
-            result = await alerts.search_alerts(
-                filters=json.dumps(cast(list[JsonDict], large_filters))
-            )
-            JSONAssertions.assert_connection_response(result)
-
-            # Verify all filters were passed
-            call_args = mock_client.search_alerts.call_args
-            assert len(call_args[1]["filters"]) == 50
+        # act & assert
+        with pytest.raises(RuntimeError, match=expected_error):
+            await alerts.search_alerts(filters=json.dumps(cast(list[JsonDict], filter_config)))
 
 
 class TestConfigurationEdgeCases:

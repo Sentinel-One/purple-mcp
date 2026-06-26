@@ -18,10 +18,13 @@ Requirements:
 Tests will be skipped if environment is not configured.
 """
 
+import time
+from datetime import datetime
+
 import pytest
 
 from purple_mcp.config import get_settings
-from purple_mcp.libs.alerts import AlertsClient, AlertsConfig, FilterInput, ViewType
+from purple_mcp.libs.alerts import Alert, AlertsClient, AlertsConfig, FilterInput, ViewType
 
 
 @pytest.fixture
@@ -32,6 +35,9 @@ def alerts_config(integration_env_check: dict[str, str]) -> AlertsConfig:
         AlertsConfig with settings from environment.
     """
     settings = get_settings()
+
+    # Ensure required credentials are not None for integration tests
+    assert settings.graphql_service_token is not None
 
     return AlertsConfig(
         graphql_url=settings.alerts_graphql_url,
@@ -53,11 +59,12 @@ class TestStringFilters:
     @pytest.mark.integration
     async def test_string_equals_severity(self, alerts_client: AlertsClient) -> None:
         """Test string_equals filter on severity field."""
+        severity_value = "CRITICAL"
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "severity",
-                    "stringEqual": {"value": "CRITICAL"},
+                    "stringEqual": {"value": severity_value},
                 }
             )
         ]
@@ -66,17 +73,20 @@ class TestStringFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.severity == severity_value
 
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_string_equals_status(self, alerts_client: AlertsClient) -> None:
         """Test string_equals filter on status field."""
+        status_value = "NEW"
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "status",
-                    "stringEqual": {"value": "NEW"},
+                    "stringEqual": {"value": status_value},
                 }
             )
         ]
@@ -85,17 +95,20 @@ class TestStringFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.status == status_value
 
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_string_equals_analyst_verdict(self, alerts_client: AlertsClient) -> None:
         """Test string_equals filter on analystVerdict field."""
+        verdict_value = "TRUE_POSITIVE"
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "analystVerdict",
-                    "stringEqual": {"value": "TRUE_POSITIVE"},
+                    "stringEqual": {"value": verdict_value},
                 }
             )
         ]
@@ -104,17 +117,20 @@ class TestStringFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.analyst_verdict == verdict_value
 
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_string_in_severity(self, alerts_client: AlertsClient) -> None:
         """Test string_in filter on severity field."""
+        severity_values = ["CRITICAL", "HIGH"]
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "severity",
-                    "stringIn": {"values": ["CRITICAL", "HIGH"]},
+                    "stringIn": {"values": severity_values},
                 }
             )
         ]
@@ -123,17 +139,21 @@ class TestStringFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        assert result.edges
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.severity in severity_values
 
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_string_in_status_multiple(self, alerts_client: AlertsClient) -> None:
         """Test string_in filter with multiple status values."""
+        status_values = ["NEW", "IN_PROGRESS", "ON_HOLD"]
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "status",
-                    "stringIn": {"values": ["NEW", "IN_PROGRESS", "ON_HOLD"]},
+                    "stringIn": {"values": status_values},
                 }
             )
         ]
@@ -142,17 +162,20 @@ class TestStringFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.status in status_values
 
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_string_in_all_severities(self, alerts_client: AlertsClient) -> None:
         """Test string_in filter with all severity values."""
+        severity_values = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "severity",
-                    "stringIn": {"values": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]},
+                    "stringIn": {"values": severity_values},
                 }
             )
         ]
@@ -161,18 +184,21 @@ class TestStringFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.severity in severity_values
 
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_string_equals_negated(self, alerts_client: AlertsClient) -> None:
         """Test string_equals filter with isNegated=true."""
+        negated_severity = "LOW"
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "severity",
                     "isNegated": True,
-                    "stringEqual": {"value": "LOW"},
+                    "stringEqual": {"value": negated_severity},
                 }
             )
         ]
@@ -181,17 +207,20 @@ class TestStringFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.severity != negated_severity
 
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_string_in_alert_name(self, alerts_client: AlertsClient) -> None:
         """Test string_in filter on alertName field."""
+        alert_name_values = ["Threat", "Malware"]
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "alertName",
-                    "stringIn": {"values": ["Threat", "Malware"]},
+                    "stringIn": {"values": alert_name_values},
                 }
             )
         ]
@@ -200,7 +229,10 @@ class TestStringFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.name is not None
+            assert any(value.lower() in edge.node.name.lower() for value in alert_name_values)
 
 
 class TestBooleanFilters:
@@ -208,13 +240,14 @@ class TestBooleanFilters:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_boolean_equals_true(self, alerts_client: AlertsClient) -> None:
+    @pytest.mark.parametrize("note_exists", [True, False])
+    async def test_boolean_equals(self, note_exists: bool, alerts_client: AlertsClient) -> None:
         """Test boolean_equals filter with value=true."""
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "alertNoteExists",
-                    "booleanEqual": {"value": True},
+                    "booleanEqual": {"value": note_exists},
                 }
             )
         ]
@@ -223,37 +256,23 @@ class TestBooleanFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.note_exists is note_exists
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_boolean_equals_false(self, alerts_client: AlertsClient) -> None:
-        """Test boolean_equals filter with value=false."""
-        filters = [
-            FilterInput.model_validate(
-                {
-                    "fieldId": "alertNoteExists",
-                    "booleanEqual": {"value": False},
-                }
-            )
-        ]
-
-        result = await alerts_client.search_alerts(
-            filters=filters, first=5, view_type=ViewType.ALL
-        )
-        assert result is not None
-        assert hasattr(result, "edges")
-
-    @pytest.mark.asyncio
-    @pytest.mark.integration
-    async def test_boolean_negated(self, alerts_client: AlertsClient) -> None:
+    @pytest.mark.parametrize("negated_value", [True, False])
+    async def test_boolean_equals_negated(
+        self, negated_value: bool, alerts_client: AlertsClient
+    ) -> None:
         """Test boolean_equals filter with isNegated=true."""
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "alertNoteExists",
                     "isNegated": True,
-                    "booleanEqual": {"value": True},
+                    "booleanEqual": {"value": negated_value},
                 }
             )
         ]
@@ -262,17 +281,20 @@ class TestBooleanFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.note_exists is not negated_value
 
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_boolean_in_single_value(self, alerts_client: AlertsClient) -> None:
         """Test boolean_in filter with single value."""
+        note_exists_values = [True]
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "alertNoteExists",
-                    "booleanIn": {"values": [True]},
+                    "booleanIn": {"values": note_exists_values},
                 }
             )
         ]
@@ -281,17 +303,20 @@ class TestBooleanFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.note_exists
 
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_boolean_in_multiple_values(self, alerts_client: AlertsClient) -> None:
         """Test boolean_in filter with multiple values (true and false)."""
+        note_exists_values = [True, False]
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "alertNoteExists",
-                    "booleanIn": {"values": [True, False]},
+                    "booleanIn": {"values": note_exists_values},
                 }
             )
         ]
@@ -300,7 +325,14 @@ class TestBooleanFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.note_exists in note_exists_values
+
+
+def datetime_str_to_timestamp_ms(datetime_str: str) -> int:
+    """Convert from an iso format timestamp to a POSIX timestamp as integer milliseconds."""
+    return int(datetime.fromisoformat(datetime_str).timestamp() * 1_000)
 
 
 class TestDateTimeFilters:
@@ -310,8 +342,6 @@ class TestDateTimeFilters:
     @pytest.mark.integration
     async def test_datetime_range_both_bounds(self, alerts_client: AlertsClient) -> None:
         """Test datetime_range filter with both start and end."""
-        import time
-
         current_time_ms = int(time.time() * 1_000)
         ninety_days_ago_ms = current_time_ms - (90 * 24 * 60 * 60 * 1_000)
 
@@ -333,14 +363,16 @@ class TestDateTimeFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.detected_at is not None
+            detected_at_ms = datetime_str_to_timestamp_ms(edge.node.detected_at)
+            assert ninety_days_ago_ms <= detected_at_ms <= current_time_ms
 
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_datetime_range_start_only(self, alerts_client: AlertsClient) -> None:
         """Test datetime_range filter with only start bound."""
-        import time
-
         thirty_days_ago_ms = int((time.time() - (30 * 24 * 60 * 60)) * 1_000)
 
         filters = [
@@ -359,14 +391,16 @@ class TestDateTimeFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.detected_at is not None
+            detected_at_ms = datetime_str_to_timestamp_ms(edge.node.detected_at)
+            assert detected_at_ms >= thirty_days_ago_ms
 
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_datetime_range_end_only(self, alerts_client: AlertsClient) -> None:
         """Test datetime_range filter with only end bound."""
-        import time
-
         current_time_ms = int(time.time() * 1_000)
 
         filters = [
@@ -385,14 +419,16 @@ class TestDateTimeFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.detected_at is not None
+            detected_at_ms = datetime_str_to_timestamp_ms(edge.node.detected_at)
+            assert detected_at_ms <= current_time_ms
 
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_datetime_range_exclusive_bounds(self, alerts_client: AlertsClient) -> None:
         """Test datetime_range filter with exclusive bounds."""
-        import time
-
         current_time_ms = int(time.time() * 1_000)
         sixty_days_ago_ms = current_time_ms - (60 * 24 * 60 * 60 * 1_000)
 
@@ -414,20 +450,22 @@ class TestDateTimeFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.detected_at is not None
+            detected_at_ms = datetime_str_to_timestamp_ms(edge.node.detected_at)
+            assert sixty_days_ago_ms < detected_at_ms < current_time_ms
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_datetime_created_at(self, alerts_client: AlertsClient) -> None:
-        """Test datetime_range filter on createdAt field."""
-        import time
-
+    async def test_datetime_first_seen_at(self, alerts_client: AlertsClient) -> None:
+        """Test datetime_range filter on firstSeenAt field."""
         seven_days_ago_ms = int((time.time() - (7 * 24 * 60 * 60)) * 1_000)
 
         filters = [
             FilterInput.model_validate(
                 {
-                    "fieldId": "createdAt",
+                    "fieldId": "firstSeenAt",
                     "dateTimeRange": {
                         "start": seven_days_ago_ms,
                         "startInclusive": True,
@@ -440,7 +478,11 @@ class TestDateTimeFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.first_seen_at is not None
+            first_seen_at_ms = datetime_str_to_timestamp_ms(edge.node.first_seen_at)
+            assert first_seen_at_ms >= seven_days_ago_ms
 
 
 class TestFulltextFilters:
@@ -450,11 +492,12 @@ class TestFulltextFilters:
     @pytest.mark.integration
     async def test_fulltext_single_term(self, alerts_client: AlertsClient) -> None:
         """Test fulltext filter with single search term."""
+        search_terms = ["threat"]
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "alertName",
-                    "match": {"values": ["threat"]},
+                    "match": {"values": search_terms},
                 }
             )
         ]
@@ -463,17 +506,21 @@ class TestFulltextFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.name is not None
+            assert any(term.lower() in edge.node.name.lower() for term in search_terms)
 
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_fulltext_multiple_terms(self, alerts_client: AlertsClient) -> None:
         """Test fulltext filter with multiple search terms."""
+        search_terms = ["malware", "threat"]
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "alertName",
-                    "match": {"values": ["malware", "threat"]},
+                    "match": {"values": search_terms},
                 }
             )
         ]
@@ -482,26 +529,10 @@ class TestFulltextFilters:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
-
-    @pytest.mark.asyncio
-    @pytest.mark.integration
-    async def test_fulltext_id_search(self, alerts_client: AlertsClient) -> None:
-        """Test fulltext filter searching alert IDs."""
-        filters = [
-            FilterInput.model_validate(
-                {
-                    "fieldId": "id",
-                    "match": {"values": ["alert"]},
-                }
-            )
-        ]
-
-        result = await alerts_client.search_alerts(
-            filters=filters, first=5, view_type=ViewType.ALL
-        )
-        assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.name is not None
+            assert any(term.lower() in edge.node.name.lower() for term in search_terms)
 
 
 class TestLongFilters:
@@ -517,11 +548,12 @@ class TestLongFilters:
 
         Note: This test may not return results if no alerts are assigned to user ID 1.
         """
+        user_id_value = 1
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "assigneeUserId",
-                    "longEqual": {"value": 1},
+                    "longEqual": {"value": user_id_value},
                 }
             )
         ]
@@ -536,11 +568,12 @@ class TestLongFilters:
     @pytest.mark.integration
     async def test_long_in_assignee_user_id(self, alerts_client: AlertsClient) -> None:
         """Test long_in filter on assigneeUserId field with multiple values."""
+        user_id_values = [1, 2, 3]
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "assigneeUserId",
-                    "longIn": {"values": [1, 2, 3]},
+                    "longIn": {"values": user_id_values},
                 }
             )
         ]
@@ -559,17 +592,19 @@ class TestFilterCombinations:
     @pytest.mark.integration
     async def test_two_string_filters(self, alerts_client: AlertsClient) -> None:
         """Test combination of two string filters (AND logic)."""
+        severity_value = "CRITICAL"
+        status_value = "NEW"
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "severity",
-                    "stringEqual": {"value": "CRITICAL"},
+                    "stringEqual": {"value": severity_value},
                 }
             ),
             FilterInput.model_validate(
                 {
                     "fieldId": "status",
-                    "stringEqual": {"value": "NEW"},
+                    "stringEqual": {"value": status_value},
                 }
             ),
         ]
@@ -578,23 +613,28 @@ class TestFilterCombinations:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.severity == severity_value
+            assert edge.node.status == status_value
 
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_string_and_boolean_filters(self, alerts_client: AlertsClient) -> None:
         """Test combination of string and boolean filters."""
+        severity_values = ["CRITICAL", "HIGH"]
+        note_exists_value = True
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "severity",
-                    "stringIn": {"values": ["CRITICAL", "HIGH"]},
+                    "stringIn": {"values": severity_values},
                 }
             ),
             FilterInput.model_validate(
                 {
                     "fieldId": "alertNoteExists",
-                    "booleanEqual": {"value": True},
+                    "booleanEqual": {"value": note_exists_value},
                 }
             ),
         ]
@@ -603,7 +643,10 @@ class TestFilterCombinations:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.severity in severity_values
+            assert edge.node.note_exists == note_exists_value
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -611,13 +654,14 @@ class TestFilterCombinations:
         """Test combination of string and datetime filters."""
         import time
 
+        status_values = ["NEW", "IN_PROGRESS"]
         thirty_days_ago_ms = int((time.time() - (30 * 24 * 60 * 60)) * 1_000)
 
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "status",
-                    "stringIn": {"values": ["NEW", "IN_PROGRESS"]},
+                    "stringIn": {"values": status_values},
                 }
             ),
             FilterInput.model_validate(
@@ -641,23 +685,26 @@ class TestFilterCombinations:
     @pytest.mark.integration
     async def test_three_filters_mixed_types(self, alerts_client: AlertsClient) -> None:
         """Test combination of three filters with different types."""
+        severity_values = ["CRITICAL", "HIGH"]
+        note_exists_value = False
+        status_value = "NEW"
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "severity",
-                    "stringIn": {"values": ["CRITICAL", "HIGH"]},
+                    "stringIn": {"values": severity_values},
                 }
             ),
             FilterInput.model_validate(
                 {
                     "fieldId": "alertNoteExists",
-                    "booleanEqual": {"value": False},
+                    "booleanEqual": {"value": note_exists_value},
                 }
             ),
             FilterInput.model_validate(
                 {
                     "fieldId": "status",
-                    "stringEqual": {"value": "NEW"},
+                    "stringEqual": {"value": status_value},
                 }
             ),
         ]
@@ -672,18 +719,20 @@ class TestFilterCombinations:
     @pytest.mark.integration
     async def test_filters_with_negation(self, alerts_client: AlertsClient) -> None:
         """Test combination of positive and negated filters."""
+        severity_values = ["CRITICAL", "HIGH"]
+        negated_status = "RESOLVED"
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "severity",
-                    "stringIn": {"values": ["CRITICAL", "HIGH"]},
+                    "stringIn": {"values": severity_values},
                 }
             ),
             FilterInput.model_validate(
                 {
                     "fieldId": "status",
                     "isNegated": True,
-                    "stringEqual": {"value": "RESOLVED"},
+                    "stringEqual": {"value": negated_status},
                 }
             ),
         ]
@@ -698,8 +747,9 @@ class TestFilterCombinations:
     @pytest.mark.integration
     async def test_complex_filter_combination(self, alerts_client: AlertsClient) -> None:
         """Test complex filter combination with multiple types and negation."""
-        import time
-
+        severity_values = ["CRITICAL", "HIGH"]
+        negated_status = "RESOLVED"
+        note_exists_value = False
         ninety_days_ago_ms = int((time.time() - (90 * 24 * 60 * 60)) * 1_000)
 
         filters = [
@@ -707,7 +757,7 @@ class TestFilterCombinations:
             FilterInput.model_validate(
                 {
                     "fieldId": "severity",
-                    "stringIn": {"values": ["CRITICAL", "HIGH"]},
+                    "stringIn": {"values": severity_values},
                 }
             ),
             # Not resolved
@@ -715,14 +765,14 @@ class TestFilterCombinations:
                 {
                     "fieldId": "status",
                     "isNegated": True,
-                    "stringEqual": {"value": "RESOLVED"},
+                    "stringEqual": {"value": negated_status},
                 }
             ),
             # No notes
             FilterInput.model_validate(
                 {
                     "fieldId": "alertNoteExists",
-                    "booleanEqual": {"value": False},
+                    "booleanEqual": {"value": note_exists_value},
                 }
             ),
             # Detected in last 90 days
@@ -735,86 +785,6 @@ class TestFilterCombinations:
                     },
                 }
             ),
-        ]
-
-        result = await alerts_client.search_alerts(
-            filters=filters, first=5, view_type=ViewType.ALL
-        )
-        assert result is not None
-        assert hasattr(result, "edges")
-
-
-class TestFieldVariations:
-    """Test filters on various field types."""
-
-    @pytest.mark.asyncio
-    @pytest.mark.integration
-    async def test_filter_severity_variations(self, alerts_client: AlertsClient) -> None:
-        """Test filtering by different severity levels."""
-        filters = [
-            FilterInput.model_validate(
-                {
-                    "fieldId": "severity",
-                    "stringIn": {"values": ["MEDIUM", "LOW", "INFO"]},
-                }
-            )
-        ]
-
-        result = await alerts_client.search_alerts(
-            filters=filters, first=5, view_type=ViewType.ALL
-        )
-        assert result is not None
-        assert hasattr(result, "edges")
-
-    @pytest.mark.asyncio
-    @pytest.mark.integration
-    async def test_filter_status_variations(self, alerts_client: AlertsClient) -> None:
-        """Test filtering by different status values."""
-        filters = [
-            FilterInput.model_validate(
-                {
-                    "fieldId": "status",
-                    "stringIn": {"values": ["DISMISSED", "CLOSED"]},
-                }
-            )
-        ]
-
-        result = await alerts_client.search_alerts(
-            filters=filters, first=5, view_type=ViewType.ALL
-        )
-        assert result is not None
-        assert hasattr(result, "edges")
-
-    @pytest.mark.asyncio
-    @pytest.mark.integration
-    async def test_filter_storyline_id(self, alerts_client: AlertsClient) -> None:
-        """Test filtering by storylineId field (flattened field)."""
-        filters = [
-            FilterInput.model_validate(
-                {
-                    "fieldId": "storylineId",
-                    "match": {"values": ["storyline"]},
-                }
-            )
-        ]
-
-        result = await alerts_client.search_alerts(
-            filters=filters, first=5, view_type=ViewType.ALL
-        )
-        assert result is not None
-        assert hasattr(result, "edges")
-
-    @pytest.mark.asyncio
-    @pytest.mark.integration
-    async def test_filter_assignee_full_name(self, alerts_client: AlertsClient) -> None:
-        """Test filtering by assigneeFullName field."""
-        filters = [
-            FilterInput.model_validate(
-                {
-                    "fieldId": "assigneeFullName",
-                    "stringEqual": {"value": "John Doe"},
-                }
-            )
         ]
 
         result = await alerts_client.search_alerts(
@@ -848,19 +818,21 @@ class TestEdgeCases:
     async def test_multiple_filters_same_field(self, alerts_client: AlertsClient) -> None:
         """Test multiple filters on the same field (severity with different values)."""
         # Note: UAM allows multiple filters on same field
+        negated_severity_1 = "LOW"
+        negated_severity_2 = "INFO"
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "severity",
                     "isNegated": True,
-                    "stringEqual": {"value": "LOW"},
+                    "stringEqual": {"value": negated_severity_1},
                 }
             ),
             FilterInput.model_validate(
                 {
                     "fieldId": "severity",
                     "isNegated": True,
-                    "stringEqual": {"value": "INFO"},
+                    "stringEqual": {"value": negated_severity_2},
                 }
             ),
         ]
@@ -869,81 +841,31 @@ class TestEdgeCases:
             filters=filters, first=5, view_type=ViewType.ALL
         )
         assert result is not None
-        assert hasattr(result, "edges")
+        for edge in result.edges:
+            assert isinstance(edge.node, Alert)
+            assert edge.node.severity not in (negated_severity_1, negated_severity_2)
 
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_max_first_parameter(self, alerts_client: AlertsClient) -> None:
         """Test search with maximum 'first' parameter value."""
+        n_requested = 100
+        severity_values = ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
         filters = [
             FilterInput.model_validate(
                 {
                     "fieldId": "severity",
-                    "stringIn": {"values": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]},
+                    "stringIn": {"values": severity_values},
                 }
             )
         ]
 
         result = await alerts_client.search_alerts(
-            filters=filters, first=100, view_type=ViewType.ALL
+            filters=filters, first=n_requested, view_type=ViewType.ALL
         )
         assert result is not None
         assert hasattr(result, "edges")
-
-    @pytest.mark.asyncio
-    @pytest.mark.integration
-    async def test_string_in_with_many_values(self, alerts_client: AlertsClient) -> None:
-        """Test string_in filter with many values."""
-        statuses = [
-            "NEW",
-            "IN_PROGRESS",
-            "ON_HOLD",
-            "RESOLVED",
-            "DISMISSED",
-            "CLOSED",
-        ]
-
-        filters = [
-            FilterInput.model_validate(
-                {
-                    "fieldId": "status",
-                    "stringIn": {"values": statuses},
-                }
-            )
-        ]
-
-        result = await alerts_client.search_alerts(
-            filters=filters, first=5, view_type=ViewType.ALL
-        )
-        assert result is not None
-        assert hasattr(result, "edges")
-
-    @pytest.mark.asyncio
-    @pytest.mark.integration
-    async def test_all_filters_negated(self, alerts_client: AlertsClient) -> None:
-        """Test search where all filters are negated."""
-        filters = [
-            FilterInput.model_validate(
-                {
-                    "fieldId": "severity",
-                    "isNegated": True,
-                    "stringEqual": {"value": "LOW"},
-                }
-            ),
-            FilterInput.model_validate(
-                {
-                    "fieldId": "status",
-                    "isNegated": True,
-                    "stringEqual": {"value": "RESOLVED"},
-                }
-            ),
-        ]
-
-        result = await alerts_client.search_alerts(
-            filters=filters, first=5, view_type=ViewType.ALL
-        )
-        assert result is not None
-        assert hasattr(result, "edges")
+        assert len(result.edges) == n_requested
 
 
 class TestPaginationWithFilters:

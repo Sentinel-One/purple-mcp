@@ -1,16 +1,19 @@
 # Docker Deployment
 
-This guide covers running Purple MCP in Docker for development and production.
+This guide covers running Purple MCP in Docker for development and release deployments.
 
 ## Requirements
 
 **Docker versions:**
+
 - Docker Engine 20.10+ (or Docker Desktop 4.0+)
 - Docker Compose V2 (2.0+)
 
-The production profile uses Docker Compose V2 features and security options (`security_opt`, `cap_drop`) that require these minimum versions.
+The release profile uses Docker Compose V2 features and security options (`security_opt`,
+`cap_drop`) that require these minimum versions.
 
 **Verify your versions:**
+
 ```bash
 docker --version
 # Should show: Docker version 20.10.0 or higher
@@ -19,7 +22,8 @@ docker compose version
 # Should show: Docker Compose version v2.0.0 or higher
 ```
 
-**Note:** Docker Compose V1 (`docker-compose` with a hyphen) is deprecated and not supported. Use `docker compose` (space, not hyphen) for V2.
+**Note:** Docker Compose V1 (`docker-compose` with a hyphen) is deprecated and not supported. Use
+`docker compose` (space, not hyphen) for V2.
 
 ## Building the Image
 
@@ -45,7 +49,8 @@ docker tag purple-mcp:latest your-registry.example.com/purple-mcp:latest
 docker push your-registry.example.com/purple-mcp:latest
 ```
 
-Replace `your-registry.example.com` with your actual registry URL (e.g., Docker Hub, AWS ECR, Google Container Registry, Azure Container Registry, or a private registry).
+Replace `your-registry.example.com` with your actual registry URL (e.g., Docker Hub, AWS ECR,
+Google Container Registry, Azure Container Registry, or a private registry).
 
 ## Running with Docker
 
@@ -56,15 +61,16 @@ export PURPLEMCP_CONSOLE_TOKEN="your_token"
 export PURPLEMCP_CONSOLE_BASE_URL="https://your-console.sentinelone.net"
 ```
 
-**Note:** Docker deployments use environment variables for mode/host/port configuration. CLI arguments (`--mode`, `--host`, `--port`) don't work in Docker containers and are silently ignored.
+**Note:** Docker deployments use environment variables for mode/host/port configuration. CLI
+arguments (`--mode`, `--host`, `--port`) don't work in Docker containers and are silently ignored.
 
 Configure the server using these variables:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MCP_MODE` | `stdio` | Transport mode: `stdio`, `sse`, or `streamable-http` |
-| `MCP_HOST` | `0.0.0.0` | Host to bind to (for SSE/HTTP modes) |
-| `MCP_PORT` | `8000` | Port to bind to (for SSE/HTTP modes) |
+| Variable   | Default   | Description                                          |
+| ---------- | --------- | ---------------------------------------------------- |
+| `MCP_MODE` | `stdio`   | Transport mode: `stdio`, `sse`, or `streamable-http` |
+| `MCP_HOST` | `0.0.0.0` | Host to bind to (for SSE/HTTP modes)                 |
+| `MCP_PORT` | `8000`    | Port to bind to (for SSE/HTTP modes)                 |
 
 CLI arguments work when running outside Docker (via `uvx` or `uv run`).
 
@@ -119,42 +125,50 @@ docker compose --profile streamable-http up
 - `sse` - Server-Sent Events transport
 - `stdio` - STDIO mode (interactive, for testing)
 - `proxy` - Nginx reverse proxy with authentication
-- `production` - Streamable-HTTP + authenticated reverse proxy (recommended for production)
+- `release` - Streamable-HTTP + authenticated reverse proxy (recommended for release deployments)
 - `all` - All modes
 
 ```bash
 # Run all HTTP modes
 docker compose --profile all up
 
-# Run production with authentication
-docker compose --profile production up
+# Run release profile with authentication
+docker compose --profile release up
 ```
 
 ## Environment Variables
 
 **Required:**
+
 - `PURPLEMCP_CONSOLE_TOKEN` - SentinelOne service user token
 - `PURPLEMCP_CONSOLE_BASE_URL` - Console URL (e.g., `https://console.sentinelone.net`)
 
 **Server configuration (Docker only):**
+
 - `MCP_MODE` - Transport mode: `stdio`, `sse`, or `streamable-http` (default: `stdio`)
 - `MCP_HOST` - Host to bind to for SSE/HTTP modes (default: `0.0.0.0`)
 - `MCP_PORT` - Port to bind to for SSE/HTTP modes (default: `8000`)
 
 **Optional:**
+
 - `PURPLEMCP_CONSOLE_GRAPHQL_ENDPOINT` - Default: `/web/api/v2.1/graphql`
 - `PURPLEMCP_ALERTS_GRAPHQL_ENDPOINT` - Default: `/web/api/v2.1/unifiedalerts/graphql`
-- `PURPLEMCP_MISCONFIGURATIONS_GRAPHQL_ENDPOINT` - Default: `/web/api/v2.1/xspm/findings/misconfigurations/graphql`
-- `PURPLEMCP_VULNERABILITIES_GRAPHQL_ENDPOINT` - Default: `/web/api/v2.1/xspm/findings/vulnerabilities/graphql`
+- `PURPLEMCP_MISCONFIGURATIONS_GRAPHQL_ENDPOINT` - Default:
+  `/web/api/v2.1/xspm/findings/misconfigurations/graphql`
+- `PURPLEMCP_VULNERABILITIES_GRAPHQL_ENDPOINT` - Default:
+  `/web/api/v2.1/xspm/findings/vulnerabilities/graphql`
 - `PURPLEMCP_INVENTORY_RESTAPI_ENDPOINT` - Default: `/web/api/v2.1/xdr/assets`
-- `PURPLEMCP_ENV` - Environment type (default: `production`)
-- `PURPLEMCP_LOGFIRE_TOKEN` - Optional observability
+- `PURPLEMCP_ENV` - Environment type (default: `release`)
+- `PURPLEMCP_LOGFIRE_TOKEN` - Optional observability - Logfire token e.g. "pylf\_..."
+- `PURPLEMCP_LOGFIRE_SERVICE_NAME` - Optional observability - Logfire service name e.g. "PurpleMCP"
 
-## Production Deployment
+## Release Deployment
 
-**Important:** Purple AI MCP has no built-in authentication. Always protect it with a reverse proxy in production.
+**Important:** Purple AI MCP has no built-in authentication. Always protect it with a reverse proxy
+in release deployments.
 
-See [Production Setup Guide](PRODUCTION_SETUP.md) for a complete example with:
+See [Cloud Setup Guide](../cloud/CLOUD_SETUP.md) for a complete example with:
+
 - Nginx reverse proxy
 - Bearer token authentication
 - HTTPS/TLS configuration
@@ -173,17 +187,19 @@ openssl req -x509 -newkey rsa:4096 \
   -keyout ssl/key.pem -out ssl/cert.pem \
   -days 365 -nodes -subj "/CN=localhost"
 
-# **WARNING: Self-signed certificates are for testing only, NOT for production use.**
-# For production, use Let's Encrypt or your organization's certificate authority.
+# **WARNING: Self-signed certificates are for testing only, NOT for release environments use.**
+# For release deployments, use Let's Encrypt or your organization's certificate authority.
 
 # Start with proxy
-docker compose --profile production up
+docker compose --profile release up
 
 # Test with auth
 curl -k -H "Authorization: Bearer $PURPLEMCP_AUTH_TOKEN" https://localhost:443/
 ```
 
-See [deploy/nginx/nginx.conf.template](deploy/nginx/nginx.conf.template) for the reverse proxy configuration. The template uses environment variable substitution (`envsubst`) to inject `PURPLEMCP_AUTH_TOKEN` at container startup.
+See [deploy/nginx/nginx.conf.template](../nginx/nginx.conf.template) for the reverse proxy
+configuration. The template uses environment variable substitution (`envsubst`) to inject
+`PURPLEMCP_AUTH_TOKEN` at container startup.
 
 ## Health Checks
 
@@ -199,7 +215,7 @@ curl http://localhost:8000/health
 curl http://localhost:8001/health
 ```
 
-### Production Proxy
+### Release Proxy
 
 When using the nginx proxy, the `/health` endpoint behavior changes for security:
 
@@ -207,7 +223,8 @@ When using the nginx proxy, the `/health` endpoint behavior changes for security
 - **Proxy `/health`**: Requires bearer token authentication
 - **Proxy `/internal/health`**: IP-restricted (Docker internal networks only)
 
-Docker health checks use the IP-restricted `/internal/health` endpoint. For external monitoring, use authenticated requests:
+Docker health checks use the IP-restricted `/internal/health` endpoint. For external monitoring,
+use authenticated requests:
 
 ```bash
 # Authenticated health check through proxy
@@ -235,6 +252,7 @@ docker run -it \
 ### Authentication errors from SentinelOne
 
 Check your token:
+
 - Must be Account or Site level (not Global)
 - Get from: Policy & Settings → User Management → Service Users
 - May have expired
@@ -269,42 +287,42 @@ spec:
         app: purple-mcp
     spec:
       containers:
-      - name: purple-mcp
-        image: your-registry.example.com/purple-mcp:latest
-        ports:
-        - containerPort: 8000
-        env:
-        - name: PURPLEMCP_CONSOLE_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: purple-mcp
-              key: console-token
-        - name: PURPLEMCP_CONSOLE_BASE_URL
-          valueFrom:
-            configMapKeyRef:
-              name: purple-mcp
-              key: console-url
-        - name: MCP_MODE
-          value: "streamable-http"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8000
-          initialDelaySeconds: 10
-          periodSeconds: 30
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8000
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "100m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
+        - name: purple-mcp
+          image: your-registry.example.com/purple-mcp:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: PURPLEMCP_CONSOLE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: purple-mcp
+                  key: console-token
+            - name: PURPLEMCP_CONSOLE_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: purple-mcp
+                  key: console-url
+            - name: MCP_MODE
+              value: "streamable-http"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
 ---
 apiVersion: v1
 kind: Service
@@ -314,8 +332,8 @@ spec:
   selector:
     app: purple-mcp
   ports:
-  - port: 8000
-    targetPort: 8000
+    - port: 8000
+      targetPort: 8000
   type: ClusterIP
 ---
 apiVersion: v1
@@ -343,18 +361,23 @@ kubectl port-forward svc/purple-mcp 8000:8000
 
 ## Security Notes
 
-**Authentication:** Purple AI MCP does not include authentication. You must run it behind a reverse proxy for any network-accessible deployment. See [Production Setup](PRODUCTION_SETUP.md) for a working example with Nginx.
+**Authentication:** Purple AI MCP does not include authentication. You must run it behind a reverse
+proxy for any network-accessible deployment. See [Cloud Setup](../cloud/CLOUD_SETUP.md) for a
+working example with Nginx.
 
-**TLS/SSL:** The proxy is configured with modern TLS and security headers. For production, use valid certificates (not self-signed). Let's Encrypt is recommended.
+**TLS/SSL:** The proxy is configured with modern TLS and security headers. For release deployments,
+use valid certificates (not self-signed). Let's Encrypt is recommended.
 
-**Secrets:** Never commit `.env` files or certificates to git. The project's `.gitignore` already excludes these. See [SECURITY.md](SECURITY.md) for additional security guidance.
+**Secrets:** Never commit `.env` files or certificates to git. The project's `.gitignore` already
+excludes these. See [SECURITY.md](../../SECURITY.md) for additional security guidance.
 
 **Rate limiting:** The proxy enforces rate limits (10 req/s) to prevent abuse.
 
-**Token rotation:** Rotate authentication tokens regularly. See [Production Setup](PRODUCTION_SETUP.md#token-management) for procedures.
+**Token rotation:** Rotate authentication tokens regularly. See
+[Cloud Setup](../cloud/CLOUD_SETUP.md#update-token) for procedures.
 
 ## Next Steps
 
-- [Production Setup Guide](PRODUCTION_SETUP.md) - Complete production deployment
-- [Contributing Guide](CONTRIBUTING.md) - Docker development
-- [Main README](README.md) - Project overview
+- [Cloud Setup Guide](../cloud/CLOUD_SETUP.md) - Complete cloud deployment
+- [Contributing Guide](../../CONTRIBUTING.md) - Docker development
+- [Main README](../../README.md) - Project overview

@@ -4,7 +4,8 @@ Configuration options and settings for the SDL Library.
 
 ## Overview
 
-The SDL library uses explicit, programmatic configuration through the `SDLSettings` class, providing type safety, validation, and environment-specific configuration support.
+The SDL library uses explicit, programmatic configuration through the `SDLSettings` class,
+providing type safety, validation, and environment-specific configuration support.
 
 ## Basic Configuration
 
@@ -22,7 +23,8 @@ settings = create_sdl_settings(
 
 ### Configuration is Always Explicit
 
-All SDL configuration must be explicitly created using `create_sdl_settings()`. There are no default or global settings objects.
+All SDL configuration must be explicitly created using `create_sdl_settings()`. There are no
+default or global settings objects.
 
 ```python
 from purple_mcp.libs.sdl import create_sdl_settings
@@ -41,30 +43,35 @@ print(f"HTTP timeout: {settings.http_timeout}")
 ### Required Settings
 
 #### `base_url` (required)
+
 Base URL for the SDL API endpoint.
 
 **Format:** `https://{console_domain}/sdl`
 
-**Security Requirement:** Only HTTPS URLs are accepted. HTTP URLs will be rejected with a validation error to ensure TLS encryption for all SDL communications.
+**Security Requirement:** Only HTTPS URLs are accepted. HTTP URLs will be rejected with a
+validation error to ensure TLS encryption for all SDL communications.
 
 **Examples:**
+
 - `https://your-console.sentinelone.net/sdl`
 
 #### `auth_token` (required)
+
 Bearer token for API authentication.
 
 **Format:** Must include "Bearer " prefix or will be automatically added
 
 **Example:**
+
 ```python
 # Both formats work
 settings = create_sdl_settings(
-    base_url="https://console.example.com/sdl",
+    base_url="https://console.sentinelone.net/sdl",
     auth_token="Bearer your-token"  # Explicit Bearer prefix
 )
 
 settings = create_sdl_settings(
-    base_url="https://console.example.com/sdl", 
+    base_url="https://console.sentinelone.net/sdl",
     auth_token="your-token"  # Bearer prefix added automatically
 )
 ```
@@ -72,91 +79,87 @@ settings = create_sdl_settings(
 ### Optional Settings
 
 #### `http_timeout` (default: 30)
+
 HTTP request timeout in seconds.
 
 **Range:** 1-300 seconds
 
 ```python
 settings = create_sdl_settings(
-    base_url="https://console.example.com/sdl",
+    base_url="https://console.sentinelone.net/sdl",
     auth_token="Bearer token",
     http_timeout=60  # 60 second timeout
 )
 ```
 
 #### `max_timeout_seconds` (default: 30)
+
 Maximum timeout for SDL operations.
 
 ```python
 settings = create_sdl_settings(
-    base_url="https://console.example.com/sdl",
+    base_url="https://console.sentinelone.net/sdl",
     auth_token="Bearer token",
     max_timeout_seconds=120  # 2 minute max timeout
 )
 ```
 
 #### `http_max_retries` (default: 3)
+
 Maximum number of HTTP request retries on failure.
 
 ```python
 settings = create_sdl_settings(
-    base_url="https://console.example.com/sdl",
+    base_url="https://console.sentinelone.net/sdl",
     auth_token="Bearer token",
     http_max_retries=5  # Retry up to 5 times
 )
 ```
 
 #### `skip_tls_verify` (default: False)
-Skip TLS certificate verification. **Not recommended for production.**
+
+Skip TLS certificate verification. **Not recommended for release environments.**
 
 ```python
 # Only for development/testing
 dev_settings = create_sdl_settings(
-    base_url="https://dev-console.example.com/sdl",
+    base_url="https://console.sentinelone.net/sdl",
     auth_token="Bearer token",
     skip_tls_verify=True  # WARNING: Security risk
 )
 ```
 
 #### `default_poll_timeout_ms` (default: 30000)
+
 Default polling timeout in milliseconds for query completion.
 
 ```python
 settings = create_sdl_settings(
-    base_url="https://console.example.com/sdl",
+    base_url="https://console.sentinelone.net/sdl",
     auth_token="Bearer token",
     default_poll_timeout_ms=60000  # 1 minute polling timeout
 )
 ```
 
 #### `default_poll_interval_ms` (default: 100)
+
 Default polling interval in milliseconds.
 
 ```python
 settings = create_sdl_settings(
-    base_url="https://console.example.com/sdl",
+    base_url="https://console.sentinelone.net/sdl",
     auth_token="Bearer token",
     default_poll_interval_ms=500  # Poll every 500ms
 )
 ```
 
-#### `max_query_results` (default: 10000)
-Maximum number of query results to retrieve.
-
-```python
-settings = create_sdl_settings(
-    base_url="https://console.example.com/sdl",
-    auth_token="Bearer token",
-    max_query_results=50000  # Retrieve up to 50k results
-)
-```
-
 #### `query_ttl_seconds` (default: 300)
+
 Query time-to-live in seconds (how long queries persist on server).
 
 ```python
 settings = create_sdl_settings(
-    base_url="https://console.example.com/sdl",
+    base_url="https://console.sentinelone.net/sdl",
     auth_token="Bearer token",
     query_ttl_seconds=600  # Queries live for 10 minutes
 )
@@ -170,25 +173,23 @@ settings = create_sdl_settings(
 from purple_mcp.libs.sdl import create_sdl_settings
 
 dev_settings = create_sdl_settings(
-    base_url="https://dev-console.company.com/sdl",
+    base_url="https://console.sentinelone.net/sdl",
     auth_token=os.getenv("SDL_DEV_TOKEN"),
     http_timeout=60,  # Longer timeout for development
     skip_tls_verify=True,  # Only for dev environments
-    default_poll_timeout_ms=120000,  # 2 minutes for complex queries
-    max_query_results=1000  # Smaller result sets for testing
+    default_poll_timeout_ms=120000  # 2 minutes for complex queries
 )
 ```
 
-### Production Configuration
+### Release Configuration
 
 ```python
-prod_settings = create_sdl_settings(
-    base_url="https://prod-console.company.com/sdl",
+release_settings = create_sdl_settings(
+    base_url="https://console.sentinelone.net/sdl",
     auth_token=os.getenv("SDL_PROD_TOKEN"),
     http_timeout=30,  # Standard timeout
     http_max_retries=5,  # More retries for reliability
-    default_poll_timeout_ms=60000,  # 1 minute timeout
-    max_query_results=100000  # Larger result sets
+    default_poll_timeout_ms=60000  # 1 minute timeout
 )
 ```
 
@@ -196,11 +197,10 @@ prod_settings = create_sdl_settings(
 
 ```python
 test_settings = create_sdl_settings(
-    base_url="https://test-console.company.com/sdl",
+    base_url="https://console.sentinelone.net/sdl",
     auth_token="test-token",
     http_timeout=10,  # Quick timeouts for tests
-    default_poll_timeout_ms=5000,  # 5 second test timeout
-    max_query_results=100  # Small test datasets
+    default_poll_timeout_ms=5000  # 5 second test timeout
 )
 ```
 
@@ -232,7 +232,6 @@ except ValidationError as e:
 - **http_timeout**: Must be positive integer (1-300)
 - **http_max_retries**: Must be non-negative integer
 - **poll timeouts**: Must be positive integers
-- **max_query_results**: Must be positive integer
 
 ## Using Configuration
 
@@ -242,7 +241,7 @@ except ValidationError as e:
 from purple_mcp.libs.sdl import SDLQueryClient, create_sdl_settings
 
 settings = create_sdl_settings(
-    base_url="https://console.example.com/sdl",
+    base_url="https://console.sentinelone.net/sdl",
     auth_token="Bearer token"
 )
 
@@ -257,7 +256,7 @@ async with SDLQueryClient(settings.base_url, settings=settings) as client:
 from purple_mcp.libs.sdl import SDLPowerQueryHandler, create_sdl_settings
 
 settings = create_sdl_settings(
-    base_url="https://console.example.com/sdl",
+    base_url="https://console.sentinelone.net/sdl",
     auth_token="Bearer token",
     default_poll_timeout_ms=60000
 )
@@ -294,7 +293,7 @@ Common environment variable patterns:
 
 ```bash
 # Required
-SDL_BASE_URL=https://console.example.com/sdl
+SDL_BASE_URL=https://console.sentinelone.net/sdl
 SDL_AUTH_TOKEN=Bearer your-token
 
 # Optional
@@ -302,7 +301,6 @@ SDL_HTTP_TIMEOUT=60
 SDL_MAX_RETRIES=5
 SDL_POLL_TIMEOUT_MS=60000
 SDL_POLL_INTERVAL_MS=500
-SDL_MAX_RESULTS=50000
 ```
 
 ## Configuration Best Practices
@@ -320,12 +318,12 @@ def get_sdl_config(environment: str):
             skip_tls_verify=True,
             http_timeout=60
         ),
-        "staging": create_sdl_settings(
-            base_url="https://staging.example.com/sdl",
-            auth_token=os.getenv("SDL_STAGING_TOKEN"),
+        "testing": create_sdl_settings(
+            base_url="https://test.example.com/sdl",
+            auth_token=os.getenv("SDL_TEST_TOKEN"),
             http_timeout=45
         ),
-        "production": create_sdl_settings(
+        "release": create_sdl_settings(
             base_url="https://prod.example.com/sdl",
             auth_token=os.getenv("SDL_PROD_TOKEN"),
             http_timeout=30,
@@ -358,13 +356,13 @@ Never hardcode tokens in source code:
 ```python
 # ❌ Bad - hardcoded token
 settings = create_sdl_settings(
-    base_url="https://console.example.com/sdl",
+    base_url="https://console.sentinelone.net/sdl",
     auth_token="Bearer hardcoded-token"  # Security risk
 )
 
 # ✅ Good - from environment
 settings = create_sdl_settings(
-    base_url="https://console.example.com/sdl",
+    base_url="https://console.sentinelone.net/sdl",
     auth_token=os.getenv("SDL_AUTH_TOKEN")
 )
 ```
@@ -376,7 +374,7 @@ Configure timeouts based on query complexity:
 ```python
 # For simple, fast queries
 quick_settings = create_sdl_settings(
-    base_url="https://console.example.com/sdl",
+    base_url="https://console.sentinelone.net/sdl",
     auth_token=os.getenv("SDL_TOKEN"),
     http_timeout=15,
     default_poll_timeout_ms=10000  # 10 seconds
@@ -384,7 +382,7 @@ quick_settings = create_sdl_settings(
 
 # For complex, long-running queries
 complex_settings = create_sdl_settings(
-    base_url="https://console.example.com/sdl",
+    base_url="https://console.sentinelone.net/sdl",
     auth_token=os.getenv("SDL_TOKEN"),
     http_timeout=60,
     default_poll_timeout_ms=300000  # 5 minutes
@@ -400,13 +398,13 @@ complex_settings = create_sdl_settings(
 ```python
 # ❌ Wrong - missing protocol
 settings = create_sdl_settings(
-    base_url="console.example.com/sdl",  # Missing https://
+    base_url="console.sentinelone.net/sdl",  # Missing https://
     auth_token="Bearer token"
 )
 
 # ✅ Correct
 settings = create_sdl_settings(
-    base_url="https://console.example.com/sdl",
+    base_url="https://console.sentinelone.net/sdl",
     auth_token="Bearer token"
 )
 ```
@@ -422,7 +420,7 @@ settings = create_sdl_settings(
 
 # ✅ Correct - the library will add Bearer prefix if missing
 settings = create_sdl_settings(
-    base_url="https://console.example.com/sdl", 
+    base_url="https://console.example.com/sdl",
     auth_token="your-actual-token"  # Bearer prefix added automatically
 )
 ```
@@ -452,12 +450,12 @@ async def test_sdl_configuration(settings):
     """Test SDL configuration."""
     try:
         from purple_mcp.libs.sdl import SDLQueryClient
-        
+
         async with SDLQueryClient(settings.base_url, settings=settings) as client:
             # Try a minimal operation to test connectivity
             print("✅ SDL configuration is valid")
             return True
-            
+
     except Exception as e:
         print(f"❌ SDL configuration failed: {e}")
         return False

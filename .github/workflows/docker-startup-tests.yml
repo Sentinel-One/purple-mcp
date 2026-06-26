@@ -266,7 +266,7 @@ jobs:
           echo "✓ 0.0.0.0 correctly triggers remote access"
 
   docker-proxy-test:
-    name: Test Production Proxy Configuration
+    name: Test Release Proxy Configuration
     needs: docker-build
     # Skip this job for fork PRs since secrets aren't available
     if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
@@ -327,7 +327,7 @@ jobs:
 
           # Warn if token is too short (less than 16 characters is weak)
           if [ ${#TEST_TOKEN} -lt 16 ]; then
-            echo "⚠ WARNING: Test token is short (${#TEST_TOKEN} chars). Production tokens should be 32+ bytes (44+ chars base64)"
+            echo "⚠ WARNING: Test token is short (${#TEST_TOKEN} chars). Release environment tokens should be 32+ bytes (44+ chars base64)"
           fi
 
       - name: Test proxy configuration
@@ -356,7 +356,7 @@ jobs:
 
           echo "✓ Token substitution verification passed"
 
-          timeout 30 docker compose --profile production up -d || {
+          timeout 30 docker compose --profile release up -d || {
             echo "✗ Failed to start services"
             docker compose logs
             exit 1

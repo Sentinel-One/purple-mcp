@@ -4,21 +4,20 @@ import asyncio
 import logging
 from http import HTTPStatus
 from types import TracebackType
-from typing import Final, Literal, cast
+from typing import Final, Literal, Self
 
 import httpx
 import tenacity
-from httpx import Headers
+from httpx import Headers, HTTPError, HTTPStatusError
 from httpx._types import QueryParamTypes
-from pydantic import JsonValue, ValidationError
-from typing_extensions import Self
+from pydantic import ValidationError
 
 from purple_mcp.libs.sdl.config import SDLSettings
 from purple_mcp.libs.sdl.enums import SDLQueryPriority, SDLQueryType
 from purple_mcp.libs.sdl.models import SDLPingResponse, SDLPQAttributes, SDLSubmitQueryResponse
 from purple_mcp.libs.sdl.sdl_exceptions import SDLMalformedResponseError
 from purple_mcp.libs.sdl.security import (
-    is_development_environment,
+    is_non_release_environment,
     log_tls_bypass_initialization,
     log_tls_bypass_request,
     validate_tls_bypass_client,
@@ -118,7 +117,7 @@ class SDLQueryClient:
         auth_token: str,
         headers: Headers | None = None,
         params: QueryParamTypes | None = None,
-        json_data: dict[str, JsonValue] | None = None,
+        json_data: JsonDict | None = None,
     ) -> httpx.Response:
         """Make an HTTP request with retry policy and timing.
 
@@ -136,6 +135,7 @@ class SDLQueryClient:
         Raises:
             httpx.HTTPError: If the request fails after retries.
         """
+        # Prepare headers
         final_headers = Headers()
         if headers is not None:
             final_headers.update(headers)
@@ -147,14 +147,34 @@ class SDLQueryClient:
 
         async for attempt in self.retry_policy:
             with attempt:
-                res = await self.http_client.request(
-                    method=method,
-                    url=path,
-                    headers=final_headers,
-                    params=params,
-                    json=json_data,
-                )
-                res.raise_for_status()
+                try:
+                    res = await self.http_client.request(
+                        method=method,
+                        url=path,
+                        headers=final_headers,
+                        params=params,
+                        json=json_data,
+                    )
+                    res.raise_for_status()
+                except HTTPStatusError:
+                    logger.error(
+                        "HTTP request failed with HTTPStatusError",
+                        extra={
+                            "status_code": res.status_code,
+                            "url": path,
+                            "method": method,
+                        },
+                    )
+                    raise
+                except HTTPError:
+                    logger.error(
+                        "HTTP request failed with HTTPError",
+                        extra={
+                            "url": path,
+                            "method": method,
+                        },
+                    )
+                    raise
 
         return res
 
@@ -167,6 +187,7 @@ class SDLQueryClient:
         account_ids: list[str] | None = None,
         query_priority: SDLQueryPriority = SDLQueryPriority.LOW,
         pq: SDLPQAttributes | None = None,
+        query_origin: str | None = None,
         headers: Headers | None = None,
     ) -> tuple[SDLSubmitQueryResponse, str]:
         """Create a new SDL PQ query.
@@ -196,6 +217,7 @@ class SDLQueryClient:
                 Use "LOW" for background operations where a delay of a second or so is acceptable.
                 LOW-priority queries have more generous rate limits.
             pq: PowerQuery attributes. Used for PQ queries
+            query_origin: Optional query origin for SDL provenance tracking.
             headers: Additional headers for the request.
 
         Returns:
@@ -215,11 +237,15 @@ class SDLQueryClient:
         if tenant is not None:
             payload["tenant"] = tenant
         if account_ids is not None:
-            payload["accountIds"] = cast(JsonValue, account_ids)
+            # ignore[assignment] as we know this is compatible with JsonDict.
+            payload["accountIds"] = account_ids  # type: ignore[assignment]
 
         if pq is not None:
             payload["pq"] = pq.model_dump(mode="json", by_alias=True)
             payload["queryType"] = SDLQueryType.PQ
+
+        if query_origin is not None:
+            payload["queryOrigin"] = query_origin
 
         res = await self._make_request(
             method="POST",
@@ -366,8 +392,8 @@ class SDLQueryClient:
 
         Raises:
             asyncio.CancelledError: Always re-raised to preserve cancellation.
-            Exception: Only in development/test environments (development, dev,
-                test, testing) when cleanup fails.
+            Exception: Only in non-release environments (development, dev,
+                test, testing, staging, stage) when cleanup fails.
         """
         try:
             await self.http_client.aclose()
@@ -380,7 +406,7 @@ class SDLQueryClient:
                 exc_info=exc,
             )
             # Re-raise in test environments for better test failure visibility
-            if is_development_environment(self.environment):
+            if is_non_release_environment(self.environment):
                 raise
 
     def is_closed(self) -> bool:

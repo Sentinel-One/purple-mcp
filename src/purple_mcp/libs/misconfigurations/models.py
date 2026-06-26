@@ -1,13 +1,13 @@
 """Pydantic models for misconfigurations data structures."""
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 # Enums
 
 
-class MisconfigurationSeverity(str, Enum):
+class MisconfigurationSeverity(StrEnum):
     """Misconfiguration severity levels."""
 
     CRITICAL = "CRITICAL"
@@ -18,7 +18,7 @@ class MisconfigurationSeverity(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-class Status(str, Enum):
+class Status(StrEnum):
     """Misconfiguration status values."""
 
     NEW = "NEW"
@@ -30,14 +30,14 @@ class Status(str, Enum):
     TO_BE_PATCHED = "TO_BE_PATCHED"
 
 
-class AnalystVerdict(str, Enum):
+class AnalystVerdict(StrEnum):
     """Analyst verdict for misconfigurations."""
 
     TRUE_POSITIVE = "TRUE_POSITIVE"
     FALSE_POSITIVE = "FALSE_POSITIVE"
 
 
-class ViewType(str, Enum):
+class ViewType(StrEnum):
     """View type for misconfiguration queries."""
 
     ALL = "ALL"
@@ -50,14 +50,14 @@ class ViewType(str, Enum):
     SECRET_SCANNING = "SECRET_SCANNING"
 
 
-class EnforcementAction(str, Enum):
+class EnforcementAction(StrEnum):
     """Enforcement action type."""
 
     DETECT = "DETECT"
     DETECT_AND_PROTECT = "DETECT_AND_PROTECT"
 
 
-class AssetCriticality(str, Enum):
+class AssetCriticality(StrEnum):
     """Asset criticality levels."""
 
     CRITICAL = "CRITICAL"
@@ -66,7 +66,7 @@ class AssetCriticality(str, Enum):
     LOW = "LOW"
 
 
-class OsType(str, Enum):
+class OsType(StrEnum):
     """Operating system types."""
 
     AIX = "AIX"
@@ -85,7 +85,7 @@ class OsType(str, Enum):
     WYSE = "WYSE"
 
 
-class HistoryEventType(str, Enum):
+class HistoryEventType(StrEnum):
     """History event types."""
 
     CREATION = "CREATION"
@@ -96,7 +96,7 @@ class HistoryEventType(str, Enum):
     WORKFLOW_ACTION = "WORKFLOW_ACTION"
 
 
-class ComplianceStatus(str, Enum):
+class ComplianceStatus(StrEnum):
     """Compliance status values."""
 
     FAIL = "FAIL"
@@ -105,7 +105,7 @@ class ComplianceStatus(str, Enum):
     OTHER = "OTHER"
 
 
-class AssetScopeLevel(str, Enum):
+class AssetScopeLevel(StrEnum):
     """Asset scope levels."""
 
     account = "account"

@@ -7,15 +7,18 @@ Complete reference for the SDL Library API.
 Low-level HTTP client for direct SDL API communication.
 
 ### Constructor
+
 ```python
 SDLQueryClient(base_url: str, settings: SDLSettings)
 ```
 
 **Parameters:**
+
 - `base_url` (str): Base URL for SDL API
 - `settings` (SDLSettings, optional): Configuration settings
 
 ### Context Manager Support
+
 ```python
 async with SDLQueryClient(base_url, settings) as client:
     # Client operations
@@ -25,21 +28,25 @@ async with SDLQueryClient(base_url, settings) as client:
 ### Methods
 
 #### `submit(auth_token: str, start_time: str, end_time: str, pq: SDLPQAttributes, query_priority: SDLQueryPriority) -> tuple[SDLQueryResponse, str]`
+
 Submit a PowerQuery to the SDL API.
 
 **Parameters:**
+
 - `auth_token` (str): Bearer token for authentication
 - `start_time` (str): Query start time (e.g., "24h", "2023-01-01T00:00:00Z")
-- `end_time` (str): Query end time (e.g., "12h", "2023-01-01T12:00:00Z") 
+- `end_time` (str): Query end time (e.g., "12h", "2023-01-01T12:00:00Z")
 - `pq` (SDLPQAttributes): PowerQuery attributes
 - `query_priority` (SDLQueryPriority): Query execution priority
 
 **Returns:** Tuple of (SDLQueryResponse, forward_tag)
 
 #### `ping_query(auth_token: str, query_id: str, x_dataset_query_forward_tag: str) -> SDLQueryResponse`
+
 Check query status and retrieve results.
 
 **Parameters:**
+
 - `auth_token` (str): Bearer token for authentication
 - `query_id` (str): Unique query identifier
 - `x_dataset_query_forward_tag` (str): Forward routing tag
@@ -47,9 +54,11 @@ Check query status and retrieve results.
 **Returns:** SDLQueryResponse with status and results
 
 #### `delete_query(auth_token: str, query_id: str, x_dataset_query_forward_tag: str) -> bool`
+
 Delete a completed query to free server resources.
 
 **Parameters:**
+
 - `auth_token` (str): Bearer token for authentication
 - `query_id` (str): Unique query identifier
 - `x_dataset_query_forward_tag` (str): Forward routing tag
@@ -57,9 +66,11 @@ Delete a completed query to free server resources.
 **Returns:** True if successfully deleted
 
 #### `close()`
+
 Close the HTTP client and cleanup resources.
 
 #### `is_closed() -> bool`
+
 Check if the client is closed.
 
 **Returns:** True if client is closed
@@ -69,6 +80,7 @@ Check if the client is closed.
 High-level interface for query lifecycle management.
 
 ### Constructor
+
 ```python
 SDLHandler(auth_token: str, base_url: str, settings: SDLSettings | None = None)
 ```
@@ -76,17 +88,21 @@ SDLHandler(auth_token: str, base_url: str, settings: SDLSettings | None = None)
 ### Abstract Methods
 
 #### `submit_query(**kwargs) -> None`
+
 Submit a query (implementation-specific).
 
 #### `get_results() -> Any`
+
 Get query results (implementation-specific).
 
 ### Concrete Methods
 
 #### `poll_until_complete() -> SDLResultData`
+
 Poll until query completion and return results.
 
 **Note:** This method takes no parameters. Configure timeouts via:
+
 - `SDLSettings.default_poll_timeout_ms` when creating settings
 - `poll_results_timeout_ms` parameter in handler constructor
 - `poll_interval_ms` parameter in handler constructor
@@ -94,11 +110,13 @@ Poll until query completion and return results.
 **Returns:** Query results as `SDLResultData`
 
 #### `is_result_partial() -> bool`
+
 Check if the last query results were partial.
 
 **Returns:** True if results are incomplete
 
 #### `close()`
+
 Close handler and cleanup resources.
 
 ## SDLPowerQueryHandler
@@ -106,6 +124,7 @@ Close handler and cleanup resources.
 Specialized handler for PowerQuery execution.
 
 ### Constructor
+
 ```python
 SDLPowerQueryHandler(auth_token: str, base_url: str, settings: SDLSettings, poll_results_timeout_ms: int | None = None, poll_interval_ms: float | None = None)
 ```
@@ -113,9 +132,11 @@ SDLPowerQueryHandler(auth_token: str, base_url: str, settings: SDLSettings, poll
 ### Methods
 
 #### `submit_powerquery(start_time: timedelta, end_time: timedelta, query: str, result_type: SDLPQResultType = SDLPQResultType.TABLE, frequency: SDLPQFrequency = SDLPQFrequency.LOW, query_priority: SDLQueryPriority = SDLQueryPriority.LOW) -> None`
+
 Submit a PowerQuery for execution.
 
 **Parameters:**
+
 - `start_time` (timedelta): Time offset from now for query start
 - `end_time` (timedelta): Time offset from now for query end
 - `query` (str): PowerQuery string
@@ -124,6 +145,7 @@ Submit a PowerQuery for execution.
 - `query_priority` (SDLQueryPriority): Execution priority (LOW or HIGH)
 
 #### `get_results() -> SDLPowerQueryResult`
+
 Get the PowerQuery results.
 
 **Returns:** SDLPowerQueryResult with columns, values, and metadata
@@ -135,6 +157,7 @@ Get the PowerQuery results.
 Configuration class with type validation.
 
 #### Fields
+
 - `base_url: str` - Base URL for SDL API
 - `auth_token: str` - Authentication token (Bearer format)
 - `http_timeout: int = 30` - HTTP request timeout in seconds
@@ -143,34 +166,36 @@ Configuration class with type validation.
 - `skip_tls_verify: bool = False` - Skip TLS verification (not recommended)
 - `default_poll_timeout_ms: int = 30000` - Default polling timeout
 - `default_poll_interval_ms: int = 100` - Default polling interval
-- `max_query_results: int = 10000` - Maximum results to retrieve
 - `query_ttl_seconds: int = 300` - Query time-to-live
 
 ### `create_sdl_settings(**kwargs) -> SDLSettings`
+
 Factory function to create SDL settings with validation.
 
 **Parameters:** Any SDLSettings field as keyword argument
 
 **Returns:** Configured SDLSettings instance
 
-
-
 ## Data Models
 
 ### Core Models
 
 #### `SDLPQAttributes`
+
 PowerQuery execution attributes.
 
 **Fields:**
+
 - `query: str` - PowerQuery string
 - `result_type: SDLPQResultType` - Expected result type
 - `frequency: SDLPQFrequency` - Query frequency
 
 #### `SDLQueryResponse`
+
 Response from SDL API query operations.
 
 **Fields:**
+
 - `id: str` - Unique query identifier
 - `steps_completed: int` - Number of completed processing steps
 - `total_steps: int` - Total processing steps required
@@ -178,9 +203,11 @@ Response from SDL API query operations.
 - `match_count: int` - Number of matches found
 
 #### `SDLPowerQueryResult`
+
 Processed PowerQuery results.
 
 **Fields:**
+
 - `columns: list[str]` - Result column names
 - `values: list[list]` - Result data rows
 - `match_count: int` - Number of matches
@@ -189,40 +216,50 @@ Processed PowerQuery results.
 ### Enums
 
 #### `SDLPQResultType`
+
 Expected PowerQuery result types.
 
 **Currently Supported Values:**
+
 - `TABLE` - Tabular results with columns/rows (default and recommended)
 
-**Note:** Only `TABLE` result type is currently supported by the PowerQuery handler. Attempting to use other result types will raise an `SDLHandlerError`.
+**Note:** Only `TABLE` result type is currently supported by the PowerQuery handler. Attempting to
+use other result types will raise an `SDLHandlerError`.
 
-**Future Enhancements:**
-The enum also defines `PLOT` for plot-based results, but this is not yet supported by the handler implementation.
+**Future Enhancements:** The enum also defines `PLOT` for plot-based results, but this is not yet
+supported by the handler implementation.
 
 #### `SDLPQFrequency`
+
 Query execution frequency hints.
 
 **Currently Supported Values:**
+
 - `LOW` - Infrequent queries (default, recommended)
 - `HIGH` - High frequency queries
 
 #### `SDLQueryPriority`
+
 Query execution priority levels.
 
 **Currently Supported Values:**
+
 - `LOW` - Low priority execution (default, recommended)
 - `HIGH` - High priority execution
 
 ## Exception Hierarchy
 
 **SDL-specific exceptions (raised during SDL operations):**
+
 - `SDLError` - Base exception for all SDL errors
 - `SDLClientError` - HTTP client errors
 - `SDLHandlerError` - Handler-level errors (includes timeout and query execution errors)
 - `SDLMalformedResponseError` - Malformed response errors
 
 **Configuration validation exceptions:**
-- `pydantic.ValidationError` - Raised by `create_sdl_settings()` when configuration parameters fail validation
+
+- `pydantic.ValidationError` - Raised by `create_sdl_settings()` when configuration parameters fail
+  validation
 
 ### Example Error Handling
 
@@ -233,7 +270,7 @@ from purple_mcp.libs.sdl import SDLHandlerError, create_sdl_settings
 # Configuration validation raises pydantic.ValidationError
 try:
     settings = create_sdl_settings(
-        base_url="https://console.example.com/sdl",
+        base_url="https://console.sentinelone.net/sdl",
         auth_token="token"
     )
 except ValidationError as e:
@@ -253,15 +290,18 @@ except SDLHandlerError as e:
 The SDL API supports multiple time formats:
 
 #### Relative Times
+
 - `"24h"` - 24 hours ago
-- `"7d"` - 7 days ago  
+- `"7d"` - 7 days ago
 - `"30m"` - 30 minutes ago
 
 #### Absolute Times
+
 - `"2023-01-01T00:00:00Z"` - ISO 8601 format
 - `"2023-01-01 00:00:00"` - Standard datetime format
 
 #### Timedelta Objects
+
 ```python
 from datetime import timedelta
 
@@ -273,14 +313,17 @@ end_time = timedelta(hours=0)     # Now
 ### Time Conversion Utilities
 
 #### `parse_time_param(time_param: datetime | timedelta) -> str`
+
 Parse datetime or timedelta objects into millisecond timestamp strings for SDL APIs.
 
 **Parameters:**
+
 - `time_param` (datetime | timedelta): Timezone-aware datetime or timedelta offset
 
 **Returns:** Time in milliseconds since epoch as a string
 
 **Raises:**
+
 - `ValueError`: If datetime is timezone-naive
 
 ```python

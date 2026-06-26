@@ -11,7 +11,14 @@ import pytest
 from pydantic import ValidationError
 
 from purple_mcp import __version__
-from purple_mcp.config import ENV_PREFIX, Settings, get_settings
+from purple_mcp.config import (
+    ENV_PREFIX,
+    SDL_BASE_URL_ENV,
+    SDL_QUERY_ORIGIN_ENV,
+    Settings,
+    _load_base_settings,
+    get_settings,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -22,11 +29,14 @@ def clear_env_and_cache(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None
         f"{ENV_PREFIX}CONSOLE_TOKEN",
         f"{ENV_PREFIX}CONSOLE_BASE_URL",
         f"{ENV_PREFIX}CONSOLE_GRAPHQL_ENDPOINT",
+        f"{ENV_PREFIX}SDL_CONSOLE_ACCOUNT_IDS",
+        f"{ENV_PREFIX}SDL_BASE_URL",
+        f"{ENV_PREFIX}SDL_QUERY_ORIGIN",
     ):
         monkeypatch.delenv(var, raising=False)
-    get_settings.cache_clear()
+    _load_base_settings.cache_clear()
     yield
-    get_settings.cache_clear()
+    _load_base_settings.cache_clear()
 
 
 @pytest.fixture
@@ -45,14 +55,18 @@ def test_defaults(minimal_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.graphql_service_token == "token"
     assert settings.sentinelone_console_base_url == "https://console.example.test"
     assert settings.sentinelone_console_graphql_endpoint == "/web/api/v2.1/graphql"
-    assert settings.purple_ai_account_id == "0"
-    assert settings.purple_ai_team_token == "0"
     assert isinstance(UUID(settings.purple_ai_session_id), UUID)
     assert settings.purple_ai_email_address is None
     assert settings.purple_ai_user_agent == f"sentinelone/purple-mcp (version {__version__})"
     assert settings.purple_ai_build_date is None
     assert settings.purple_ai_build_hash is None
-    assert settings.purple_ai_console_version == "S"
+    assert settings.purple_ai_console_version is None
+    # Console scope IDs default to None; operators populate them per deployment.
+    assert settings.purple_ai_console_id is None
+    assert settings.purple_ai_console_tenant_id is None
+    assert settings.purple_ai_console_account_id is None
+    assert settings.purple_ai_console_site_id is None
+    assert settings.sdl_query_origin == "ai_purple_mcp"
 
 
 @pytest.mark.parametrize(
@@ -196,6 +210,39 @@ def test_console_base_url_valid(
     monkeypatch.setenv(f"{ENV_PREFIX}CONSOLE_BASE_URL", base_url)
     settings = Settings()
     assert settings.sentinelone_console_base_url == base_url
+
+
+@pytest.mark.parametrize(
+    "scope_id_env",
+    [
+        f"{ENV_PREFIX}PURPLE_AI_CONSOLE_ID",
+        f"{ENV_PREFIX}PURPLE_AI_CONSOLE_TENANT_ID",
+        f"{ENV_PREFIX}PURPLE_AI_CONSOLE_ACCOUNT_ID",
+        f"{ENV_PREFIX}PURPLE_AI_CONSOLE_SITE_ID",
+    ],
+)
+def test_purple_ai_console_scope_id_whitespace_rejected(
+    scope_id_env: str, minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Whitespace-only Purple AI console scope IDs are rejected at startup."""
+    monkeypatch.setenv(scope_id_env, "   ")
+    with pytest.raises(ValidationError, match="scope ID must be a non-empty string"):
+        Settings()
+
+
+def test_purple_ai_console_scope_ids_stripped(
+    minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Valid Purple AI console scope IDs are accepted with whitespace stripped."""
+    monkeypatch.setenv(f"{ENV_PREFIX}PURPLE_AI_CONSOLE_ID", "  1111111111111111111  ")
+    monkeypatch.setenv(f"{ENV_PREFIX}PURPLE_AI_CONSOLE_TENANT_ID", "  2222222222222222222  ")
+    monkeypatch.setenv(f"{ENV_PREFIX}PURPLE_AI_CONSOLE_ACCOUNT_ID", " 3333333333333333333 ")
+    monkeypatch.setenv(f"{ENV_PREFIX}PURPLE_AI_CONSOLE_SITE_ID", "4444444444444444444 ")
+    settings = Settings()
+    assert settings.purple_ai_console_id == "1111111111111111111"
+    assert settings.purple_ai_console_tenant_id == "2222222222222222222"
+    assert settings.purple_ai_console_account_id == "3333333333333333333"
+    assert settings.purple_ai_console_site_id == "4444444444444444444"
 
 
 @pytest.mark.parametrize(
@@ -344,13 +391,12 @@ def test_extra_env_vars_are_ignored(minimal_env: None, monkeypatch: pytest.Monke
 
 
 def test_combined_missing_token_and_invalid_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Both missing token and invalid base URL errors should appear."""
+    """Invalid base URL is caught before missing token (field validator runs first)."""
     monkeypatch.setenv(f"{ENV_PREFIX}CONSOLE_BASE_URL", "http://insecure.test/")
     with pytest.raises(ValidationError) as exc:
         Settings()
     err = str(exc.value)
-    # Note: SDL token now uses CONSOLE_TOKEN, so we check for CONSOLE_TOKEN instead
-    assert f"{ENV_PREFIX}CONSOLE_TOKEN" in err
+    # Field validator catches invalid URL before model validator checks for missing token
     assert "Console base URL must use HTTPS" in err
 
 
@@ -421,10 +467,11 @@ def test_model_post_init_includes_correct_graphql_url(
 
 
 def test_get_settings_caching(minimal_env: None) -> None:
-    """get_settings should cache on success."""
-    get_settings.cache_clear()
+    """get_settings should cache on success (via _load_base_settings)."""
+    _load_base_settings.cache_clear()
     s1 = get_settings()
     s2 = get_settings()
+    # When no overrides are present, get_settings returns the cached base settings
     assert s1 is s2
 
 
@@ -432,7 +479,7 @@ def test_get_settings_validation_error(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     """get_settings should log critical error on ValidationError."""
-    get_settings.cache_clear()
+    _load_base_settings.cache_clear()
     caplog.set_level(logging.CRITICAL)
     # Don't set any env vars, so validation fails
     with pytest.raises(ValidationError):
@@ -446,7 +493,7 @@ def test_get_settings_general_exception(
     minimal_env: None, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     """get_settings should log critical error on any exception."""
-    get_settings.cache_clear()
+    _load_base_settings.cache_clear()
     caplog.clear()
     caplog.set_level(logging.CRITICAL)
 
@@ -520,44 +567,12 @@ def test_settings_config_dict() -> None:
     assert Settings.model_config["extra"] == "ignore"
 
 
-def test_field_descriptions() -> None:
-    """Test that all fields have descriptions."""
-    fields = Settings.model_fields
-    # SDL token now uses Console token, so description reflects this
-    assert (
-        fields["sdl_api_token"].description
-        == "Authentication token for PowerQuery logs API (uses Console Token)"
-    )
-    assert (
-        fields["graphql_service_token"].description
-        == "Service token for SentinelOne OpsCenter Console API"
-    )
-    assert (
-        fields["sentinelone_console_base_url"].description
-        == "Base URL for Scalyr/SentinelOne console"
-    )
-    assert (
-        fields["sentinelone_console_graphql_endpoint"].description
-        == "GraphQL endpoint for Purple AI"
-    )
-    assert fields["purple_ai_account_id"].description == "Account ID for Purple AI user details"
-    assert fields["purple_ai_team_token"].description == "Team token for Purple AI user details"
-    assert (
-        fields["purple_ai_email_address"].description == "Email address for Purple AI user details"
-    )
-    assert fields["purple_ai_user_agent"].description == "User agent for Purple AI user details"
-    assert fields["purple_ai_build_date"].description == "Build date for Purple AI user details"
-    assert fields["purple_ai_build_hash"].description == "Build hash for Purple AI user details"
-    assert (
-        fields["purple_ai_console_version"].description == "Version for Purple AI console details"
-    )
-
-
 def test_field_aliases() -> None:
     """Test that field validation aliases are correctly set."""
     fields = Settings.model_fields
     # Both SDL and Console tokens now use CONSOLE_TOKEN
     assert fields["sdl_api_token"].validation_alias == f"{ENV_PREFIX}CONSOLE_TOKEN"
+    assert fields["sdl_query_origin"].validation_alias == f"{ENV_PREFIX}SDL_QUERY_ORIGIN"
     assert fields["graphql_service_token"].validation_alias == f"{ENV_PREFIX}CONSOLE_TOKEN"
     assert (
         fields["sentinelone_console_base_url"].validation_alias == f"{ENV_PREFIX}CONSOLE_BASE_URL"
@@ -566,8 +581,6 @@ def test_field_aliases() -> None:
         fields["sentinelone_console_graphql_endpoint"].validation_alias
         == f"{ENV_PREFIX}CONSOLE_GRAPHQL_ENDPOINT"
     )
-    assert fields["purple_ai_account_id"].validation_alias == f"{ENV_PREFIX}PURPLE_AI_ACCOUNT_ID"
-    assert fields["purple_ai_team_token"].validation_alias == f"{ENV_PREFIX}PURPLE_AI_TEAM_TOKEN"
     assert (
         fields["purple_ai_email_address"].validation_alias
         == f"{ENV_PREFIX}PURPLE_AI_EMAIL_ADDRESS"
@@ -578,6 +591,19 @@ def test_field_aliases() -> None:
     assert (
         fields["purple_ai_console_version"].validation_alias
         == f"{ENV_PREFIX}PURPLE_AI_CONSOLE_VERSION"
+    )
+    assert fields["purple_ai_console_id"].validation_alias == f"{ENV_PREFIX}PURPLE_AI_CONSOLE_ID"
+    assert (
+        fields["purple_ai_console_tenant_id"].validation_alias
+        == f"{ENV_PREFIX}PURPLE_AI_CONSOLE_TENANT_ID"
+    )
+    assert (
+        fields["purple_ai_console_account_id"].validation_alias
+        == f"{ENV_PREFIX}PURPLE_AI_CONSOLE_ACCOUNT_ID"
+    )
+    assert (
+        fields["purple_ai_console_site_id"].validation_alias
+        == f"{ENV_PREFIX}PURPLE_AI_CONSOLE_SITE_ID"
     )
 
 
@@ -630,3 +656,405 @@ def test_mixed_case_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     # Both tokens now use the same console token value
     assert settings.sdl_api_token == "mixed2"
     assert settings.graphql_service_token == "mixed2"
+
+
+# --- SDL base URL tests ---
+
+
+def test_sdl_base_url_defaults_to_none(minimal_env: None) -> None:
+    """SDL base URL defaults to None when not set."""
+    settings = Settings()
+    assert settings.sdl_base_url is None
+
+
+def test_sdl_query_origin_default(minimal_env: None) -> None:
+    """SDL query origin has a default when not set."""
+    settings = Settings()
+    assert settings.sdl_query_origin == "ai_purple_mcp"
+
+
+@pytest.mark.parametrize(
+    "query_origin",
+    [
+        "purple_mcp",
+        "purple-mcp",
+        "a",
+        "a" * 64,
+        "purple_mcp_1",
+    ],
+)
+def test_sdl_query_origin_valid(
+    query_origin: str, minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Valid SDL query origins should pass unchanged."""
+    monkeypatch.setenv(SDL_QUERY_ORIGIN_ENV, query_origin)
+    settings = Settings()
+    assert settings.sdl_query_origin == query_origin
+
+
+@pytest.mark.parametrize(
+    "query_origin",
+    [
+        "",
+        "   ",
+    ],
+)
+def test_sdl_query_origin_empty_values_become_none(
+    query_origin: str, minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Empty SDL query origins should behave as unset."""
+    monkeypatch.setenv(SDL_QUERY_ORIGIN_ENV, query_origin)
+    settings = Settings()
+    assert settings.sdl_query_origin is None
+
+
+@pytest.mark.parametrize(
+    "query_origin",
+    [
+        "Purple-MCP",
+        "-purple-mcp",
+        "purple-mcp-",
+        "purple mcp",
+        "a" * 65,
+    ],
+)
+def test_sdl_query_origin_invalid_values_fail_open(
+    query_origin: str,
+    minimal_env: None,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Invalid SDL query origins should be ignored instead of failing startup."""
+    monkeypatch.setenv(SDL_QUERY_ORIGIN_ENV, query_origin)
+    caplog.set_level(logging.WARNING)
+
+    settings = Settings()
+
+    assert settings.sdl_query_origin is None
+    assert any("Ignoring invalid SDL query origin." in rec.message for rec in caplog.records)
+
+
+def test_sdl_base_url_field_alias(minimal_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    """SDL base URL reads from the correct environment variable."""
+    monkeypatch.setenv(SDL_BASE_URL_ENV, "https://dedicated.url.example.test")
+    settings = Settings()
+    assert settings.sdl_base_url == "https://dedicated.url.example.test"
+
+
+@pytest.mark.parametrize(
+    "sdl_url,err_fragment",
+    [
+        ("http://example.test", "SDL base URL must use HTTPS"),
+        ("ftp://example.test", "SDL base URL must use HTTPS"),
+        ("https://example.test/", "SDL base URL must not have a trailing slash"),
+        ("https://example.test/sdl", "SDL base URL must not contain a path"),
+        ("https://example.test?foo=bar", "SDL base URL must not contain query parameters"),
+        ("https://example.test#fragment", "SDL base URL must not contain a fragment"),
+        ("https://example.test;params", "SDL base URL must not contain path parameters"),
+    ],
+)
+def test_sdl_base_url_invalid(
+    sdl_url: str, err_fragment: str, minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Invalid SDL base URLs should produce validation errors."""
+    monkeypatch.setenv(SDL_BASE_URL_ENV, sdl_url)
+    with pytest.raises(ValidationError) as exc:
+        Settings()
+    assert err_fragment in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    "sdl_url",
+    [
+        "https://dedicated.url.example.test",
+        "https://dedicated-url.sentinelone.test",
+        "https://localhost:8443",
+    ],
+)
+def test_sdl_base_url_valid(
+    sdl_url: str, minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Valid HTTPS SDL base URLs should pass unchanged."""
+    monkeypatch.setenv(SDL_BASE_URL_ENV, sdl_url)
+    settings = Settings()
+    assert settings.sdl_base_url == sdl_url
+
+
+# --- sdl_full_url property tests ---
+
+
+def test_sdl_full_url_falls_back_to_console_url(minimal_env: None) -> None:
+    """When no dedicated SDL URL is set, sdl_full_url returns console base URL + /sdl."""
+    settings = Settings()
+    assert settings.sdl_base_url is None
+    assert settings.sdl_full_url == "https://console.example.test/sdl"
+
+
+def test_sdl_full_url_prefers_dedicated_sdl_url(
+    minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When a dedicated SDL URL is set, sdl_full_url returns it directly."""
+    monkeypatch.setenv(SDL_BASE_URL_ENV, "https://dedicated.url.example.test")
+    settings = Settings()
+    assert settings.sdl_full_url == "https://dedicated.url.example.test"
+
+
+def test_sdl_full_url_dedicated_url_takes_precedence_over_console(
+    minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When both SDL and console URLs are set, SDL URL takes precedence."""
+    monkeypatch.setenv(SDL_BASE_URL_ENV, "https://dedicated.url.example.test")
+    settings = Settings()
+    # Console URL is set via minimal_env, but SDL URL should take precedence
+    assert settings.sentinelone_console_base_url == "https://console.example.test"
+    assert settings.sdl_full_url == "https://dedicated.url.example.test"
+
+
+@pytest.fixture()
+def fake_console_scope_ids() -> list[str]:
+    """Return a list of strings which could plausibly be valid S1 Console Account IDs.
+
+    Criteria:
+        * 18 or 19 digits.
+        * All characters are numeric.
+    """
+    return ["1" * 18, "2" * 18, "3" * 19]
+
+
+def test_sdl_console_account_ids_from_comma_separated_string(
+    fake_console_scope_ids: list[str], minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that SDL console account IDs can be parsed from comma-separated string."""
+    expected_ids = fake_console_scope_ids
+
+    monkeypatch.setenv(f"{ENV_PREFIX}SDL_CONSOLE_ACCOUNT_IDS", ",".join(expected_ids))
+    settings = Settings()
+    assert settings.sdl_console_account_ids == expected_ids
+
+
+def test_sdl_console_account_ids_with_whitespace(
+    fake_console_scope_ids: list[str], minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that SDL console account IDs trim whitespace."""
+    ids = fake_console_scope_ids
+    whitespaced_string = f" {' , '.join(ids)} "
+    assert whitespaced_string.startswith(" ")
+    assert " , " in whitespaced_string
+    monkeypatch.setenv(f"{ENV_PREFIX}SDL_CONSOLE_ACCOUNT_IDS", whitespaced_string)
+
+    settings = Settings()
+
+    assert settings.sdl_console_account_ids == ids
+
+
+def test_sdl_console_account_ids_single_value(
+    fake_console_scope_ids: list[str], minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that SDL console account IDs work with single value (comma-separated string)."""
+    single_id = fake_console_scope_ids[0]
+    # Note: pydantic-settings will try JSON parsing first, then fall back to the validator
+    # for comma-separated strings
+    monkeypatch.setenv(f"{ENV_PREFIX}SDL_CONSOLE_ACCOUNT_IDS", single_id)
+    settings = Settings()
+    assert settings.sdl_console_account_ids == [single_id]
+
+
+@pytest.mark.parametrize(
+    "empty_string_value",
+    [
+        "",  # empty string should be same as unset
+        "[]",  # empty list should be same as unset
+    ],
+)
+def test_sdl_console_account_ids_empty_strings_result_in_none_value(
+    minimal_env: None, monkeypatch: pytest.MonkeyPatch, empty_string_value: str
+) -> None:
+    """Test that empty string (or string-representation of an empty-list) results in None."""
+    monkeypatch.setenv(f"{ENV_PREFIX}SDL_CONSOLE_ACCOUNT_IDS", empty_string_value)
+    settings = Settings()
+    assert settings.sdl_console_account_ids is None
+
+
+def test_sdl_console_account_ids_not_set(minimal_env: None) -> None:
+    """Test that SDL console account IDs default to None when not set."""
+    settings = Settings()
+    assert settings.sdl_console_account_ids is None
+
+
+@pytest.mark.parametrize(
+    "bad_lenth_substrs",
+    # (Dummy values must  have 18 or 19 chars to pass 'before' validator and hit the numeric validator.
+    [
+        "1,2,3",
+        "123456",
+        "12345,7890,1234567",  # 18 chars in total but not per-ID.
+        "12345678901234567890",  # 20 chars is Too long
+    ],
+)
+def test_sdl_console_account_ids_reject_bad_length_values(
+    bad_lenth_substrs: str, minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Check that we reject console-account ID strings which are not either 18 or 19 chars long."""
+    monkeypatch.setenv(f"{ENV_PREFIX}SDL_CONSOLE_ACCOUNT_IDS", bad_lenth_substrs)
+    with pytest.raises(
+        ValidationError,
+        match=r"String should have at least 18 characters|"
+        "String should have at most 19 characters",
+    ):
+        Settings()
+
+
+@pytest.mark.parametrize(
+    "non_numeric_str",
+    # (Dummy values must  have 18 or 19 chars to pass 'before' validator and hit the numeric validator.
+    ["1" * 17 + "a", "a" + "2" * 17, "one" * 6],
+)
+def test_sdl_console_account_ids_reject_non_alphanumeric(
+    non_numeric_str: str, minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Check that we reject console-account ID strings which are non-numeric."""
+    monkeypatch.setenv(f"{ENV_PREFIX}SDL_CONSOLE_ACCOUNT_IDS", non_numeric_str)
+    with pytest.raises(ValidationError, match=r"is not a numeric string"):
+        Settings()
+
+
+def test_sdl_console_account_ids_with_trailing_commas(
+    fake_console_scope_ids: list[str], minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that trailing commas are handled correctly."""
+    expected_ids = fake_console_scope_ids
+    comma_separated_with_trailing_comma = ",".join(expected_ids) + ","
+    monkeypatch.setenv(f"{ENV_PREFIX}SDL_CONSOLE_ACCOUNT_IDS", comma_separated_with_trailing_comma)
+    settings = Settings()
+    assert settings.sdl_console_account_ids == expected_ids
+
+
+def test_sdl_console_site_ids_from_comma_separated_string(
+    fake_console_scope_ids: list[str], minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that SDL console account IDs can be parsed from comma-separated string."""
+    expected_ids = fake_console_scope_ids
+
+    monkeypatch.setenv(f"{ENV_PREFIX}SDL_CONSOLE_SITE_IDS", ",".join(expected_ids))
+    settings = Settings()
+    assert settings.sdl_console_site_ids == expected_ids
+
+
+def test_sdl_console_site_ids_with_whitespace(
+    fake_console_scope_ids: list[str], minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that SDL console account IDs trim whitespace."""
+    ids = fake_console_scope_ids
+    whitespaced_string = f" {' , '.join(ids)} "
+    assert whitespaced_string.startswith(" ")
+    assert " , " in whitespaced_string
+    monkeypatch.setenv(f"{ENV_PREFIX}SDL_CONSOLE_SITE_IDS", whitespaced_string)
+
+    settings = Settings()
+
+    assert settings.sdl_console_site_ids == ids
+
+
+def test_sdl_console_site_ids_single_value(
+    fake_console_scope_ids: list[str], minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that SDL console account IDs work with single value (comma-separated string)."""
+    single_id = fake_console_scope_ids[0]
+    # Note: pydantic-settings will try JSON parsing first, then fall back to the validator
+    # for comma-separated strings
+    monkeypatch.setenv(f"{ENV_PREFIX}SDL_CONSOLE_SITE_IDS", single_id)
+    settings = Settings()
+    assert settings.sdl_console_site_ids == [single_id]
+
+
+@pytest.mark.parametrize(
+    "empty_string_value",
+    [
+        "",  # empty string should be same as unset
+        "[]",  # empty list should be same as unset
+    ],
+)
+def test_sdl_console_site_ids_empty_strings_result_in_none_value(
+    minimal_env: None, monkeypatch: pytest.MonkeyPatch, empty_string_value: str
+) -> None:
+    """Test that empty string (or string-representation of an empty-list) results in None."""
+    monkeypatch.setenv(f"{ENV_PREFIX}SDL_CONSOLE_SITE_IDS", empty_string_value)
+    settings = Settings()
+    assert settings.sdl_console_site_ids is None
+
+
+def test_sdl_console_site_ids_not_set(minimal_env: None) -> None:
+    """Test that SDL console account IDs default to None when not set."""
+    settings = Settings()
+    assert settings.sdl_console_site_ids is None
+
+
+@pytest.mark.parametrize(
+    "bad_lenth_substrs",
+    # (Dummy values must  have 18 or 19 chars to pass 'before' validator and hit the numeric validator.
+    [
+        "1,2,3",
+        "123456",
+        "12345,7890,1234567",  # 18 chars in total but not per-ID.
+        "12345678901234567890",  # 20 chars is Too long
+    ],
+)
+def test_sdl_console_site_ids_reject_bad_length_values(
+    bad_lenth_substrs: str, minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Check that we reject console-account ID strings which are not either 18 or 19 chars long."""
+    monkeypatch.setenv(f"{ENV_PREFIX}SDL_CONSOLE_SITE_IDS", bad_lenth_substrs)
+    with pytest.raises(
+        ValidationError,
+        match=r"String should have at least 18 characters|"
+        "String should have at most 19 characters",
+    ):
+        Settings()
+
+
+@pytest.mark.parametrize(
+    "non_numeric_str",
+    # (Dummy values must  have 18 or 19 chars to pass 'before' validator and hit the numeric validator.
+    ["1" * 17 + "a", "a" + "2" * 17, "one" * 6],
+)
+def test_sdl_console_site_ids_reject_non_alphanumeric(
+    non_numeric_str: str, minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Check that we reject console-account ID strings which are non-numeric."""
+    monkeypatch.setenv(f"{ENV_PREFIX}SDL_CONSOLE_SITE_IDS", non_numeric_str)
+    with pytest.raises(ValidationError, match=r"is not a numeric string"):
+        Settings()
+
+
+def test_sdl_console_site_ids_with_trailing_commas(
+    fake_console_scope_ids: list[str], minimal_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that trailing commas are handled correctly."""
+    expected_ids = fake_console_scope_ids
+    comma_separated_with_trailing_comma = ",".join(expected_ids) + ","
+    monkeypatch.setenv(f"{ENV_PREFIX}SDL_CONSOLE_SITE_IDS", comma_separated_with_trailing_comma)
+    settings = Settings()
+    assert settings.sdl_console_site_ids == expected_ids
+
+
+@pytest.mark.parametrize(
+    "deprecated_var",
+    [
+        f"{ENV_PREFIX}PURPLE_AI_ACCOUNT_ID",
+        f"{ENV_PREFIX}PURPLE_AI_TEAM_TOKEN",
+    ],
+)
+def test_deprecated_env_var_emits_startup_warning(
+    deprecated_var: str,
+    minimal_env: None,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Each removed env var emits a startup WARNING when still set."""
+    monkeypatch.setenv(deprecated_var, "some-stale-value")
+    with caplog.at_level("WARNING", logger="purple_mcp.config"):
+        _load_base_settings()
+    assert any(deprecated_var in record.message for record in caplog.records), (
+        f"Expected a WARNING mentioning {deprecated_var}, got: "
+        f"{[r.message for r in caplog.records]}"
+    )

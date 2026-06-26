@@ -13,29 +13,12 @@ Key Components:
       set.
     - SDLQueryPriority: Queue priority used by the scheduler.
     - SDLPQFrequency: Sampling frequency controlling aggregation granularity.
-
-Usage:
-    ```python
-    from purple_mcp.libs.sdl.enums import SDLQueryType, SDLPQResultType
-
-    if status == SDLQueryType.LOG:
-        ...  # handle log pipeline
-    ```
-
-Architecture:
-    All enums inherit from `enum.StrEnum` (Python 3.11+) so they can be
-    serialized to JSON without explicit casting and maintain type safety in
-    type-checked contexts.
-
-Dependencies:
-    enum: Standard-library module providing the base `Enum`/`StrEnum`
-    functionality.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class SDLQueryType(str, Enum):
+class SDLQueryType(StrEnum):
     """Enum for SDL query types."""
 
     LOG = "LOG"
@@ -46,14 +29,14 @@ class SDLQueryType(str, Enum):
     DISTRIBUTION = "DISTRIBUTION"
 
 
-class SDLPQResultType(str, Enum):
+class SDLPQResultType(StrEnum):
     """Enum for SDL PQ result types."""
 
     TABLE = "TABLE"
     PLOT = "PLOT"
 
 
-class PQColumnType(str, Enum):
+class PQColumnType(StrEnum):
     """Enum for PQ column types."""
 
     NUMBER = "NUMBER"
@@ -62,14 +45,14 @@ class PQColumnType(str, Enum):
     TIMESTAMP = "TIMESTAMP"
 
 
-class SDLQueryPriority(str, Enum):
+class SDLQueryPriority(StrEnum):
     """Enum for SDL query status."""
 
     LOW = "LOW"
     HIGH = "HIGH"
 
 
-class SDLPQFrequency(str, Enum):
+class SDLPQFrequency(StrEnum):
     """Enum for SDL PQ frequency."""
 
     LOW = "LOW"

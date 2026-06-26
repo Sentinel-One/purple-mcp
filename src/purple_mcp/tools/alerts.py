@@ -9,7 +9,7 @@ import logging
 from textwrap import dedent
 from typing import Final, cast
 
-from purple_mcp.config import get_settings
+from purple_mcp.config import get_settings, validate_request_credentials
 from purple_mcp.libs.alerts import AlertsClient, AlertsConfig, FilterInput, ViewType
 from purple_mcp.tools.fields_validation import (
     MAX_FIELD_LENGTH as _MAX_FIELD_LENGTH,
@@ -387,6 +387,12 @@ def _get_alerts_client() -> AlertsClient:
             f"Settings not initialized. Please check your environment configuration. Error: {e}"
         ) from e
 
+    # Validate credentials are available (alerts only needs token, not base URL)
+    validate_request_credentials(settings, require_base_url=False)
+
+    # After validation, token is guaranteed to be non-None
+    assert settings.graphql_service_token is not None
+
     config = AlertsConfig(
         graphql_url=settings.alerts_graphql_url,
         auth_token=settings.graphql_service_token,
@@ -416,7 +422,7 @@ async def get_alert(alert_id: str) -> str:
     """
     try:
         client = _get_alerts_client()
-        alert = await client.get_alert(alert_id)
+        alert = await client.get_alert(alert_id=alert_id)
 
         if alert is None:
             return json.dumps(None, indent=2)
@@ -501,7 +507,7 @@ def _convert_filters_to_input(filters: list[JsonDict]) -> list[FilterInput]:
     return filter_inputs
 
 
-def _parse_filters_parameter(filters: str | None) -> list[JsonDict] | None:
+def _parse_filters_parameter(filters: str) -> list[JsonDict]:
     """Parse and validate the filters parameter from JSON string input.
 
     Args:
@@ -513,9 +519,6 @@ def _parse_filters_parameter(filters: str | None) -> list[JsonDict] | None:
     Raises:
         ValueError: If filters format is invalid.
     """
-    if filters is None:
-        return None
-
     try:
         parsed = json.loads(filters)
         if not isinstance(parsed, list):
@@ -535,9 +538,19 @@ def _parse_fields(fields: str | None) -> list[str] | None:
         Parsed list of field names, or None if no fields specified.
 
     Raises:
-        ValueError: If fields format is invalid.
+        ValueError: If fields format is invalid or exceeds configured limits.
     """
     return parse_fields_parameter(fields)
+
+
+def load_filters(filters_as_json_str: str | None) -> list[FilterInput]:
+    """Loads the list of Filters from the input string."""
+    if filters_as_json_str is None:
+        return []
+    parsed_dicts = _parse_filters_parameter(filters_as_json_str)
+    _validate_filter_limits(parsed_dicts)
+    filter_inputs = _convert_filters_to_input(parsed_dicts)
+    return filter_inputs
 
 
 async def search_alerts(
@@ -578,19 +591,14 @@ async def search_alerts(
             raise ValueError(f"view_type must be one of: {valid_types}") from None
 
         # Parse and validate filters parameter
-        parsed_filters = _parse_filters_parameter(filters)
-
-        # DoS protection: validate filter count and value array lengths
-        filter_inputs = None
-        if parsed_filters:
-            _validate_filter_limits(parsed_filters)
-            filter_inputs = _convert_filters_to_input(parsed_filters)
+        # includes DoS protection: validate filter count and value array lengths
+        parsed_filters = load_filters(filters)
 
         parsed_fields = _parse_fields(fields)
 
         client = _get_alerts_client()
         alerts = await client.search_alerts(
-            filters=filter_inputs,
+            filters=parsed_filters,
             first=first,
             after=after,
             view_type=view_type_enum,

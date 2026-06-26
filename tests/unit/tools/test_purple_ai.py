@@ -215,7 +215,7 @@ class TestPurpleAIRealClient:
     Benefits over pure mocking:
     - Catches configuration drift (wrong URL joins, missing headers)
     - Validates actual request payloads sent over the wire
-    - Tests work closer to production code paths
+    - Tests work closer to release environment code paths
     - Easier to debug when requests don't match expectations
     """
 
@@ -250,8 +250,6 @@ class TestPurpleAIRealClient:
         environment variables (particularly PURPLEMCP_CONSOLE_GRAPHQL_ENDPOINT)
         into this test's execution context.
         """
-        from purple_mcp.config import get_settings
-
         # Regression guard: Fail fast if CLI tests leaked environment state
         # This helps catch cases where CLI tests don't properly clean up after
         # themselves, which can cause intermittent failures under pytest-xdist.
@@ -274,19 +272,23 @@ class TestPurpleAIRealClient:
                 f"os.environ must restore the original values afterwards."
             )
 
+        from purple_mcp.config import _load_base_settings
+
         # Save original environment
         original_env = os.environ.copy()
 
         # Clear settings cache to ensure fresh settings
-        get_settings.cache_clear()
+        _load_base_settings.cache_clear()
 
         # Set test environment variables
-        os.environ[f"{ENV_PREFIX}PURPLE_AI_ACCOUNT_ID"] = "test-account-123"
-        os.environ[f"{ENV_PREFIX}PURPLE_AI_TEAM_TOKEN"] = "test-team-token"
         os.environ[f"{ENV_PREFIX}PURPLE_AI_EMAIL_ADDRESS"] = "test@example.test"
         os.environ[f"{ENV_PREFIX}PURPLE_AI_USER_AGENT"] = "test-agent/1.0"
         os.environ[f"{ENV_PREFIX}PURPLE_AI_BUILD_DATE"] = "2025-01-15"
         os.environ[f"{ENV_PREFIX}PURPLE_AI_BUILD_HASH"] = "abc123def456"
+        os.environ[f"{ENV_PREFIX}PURPLE_AI_CONSOLE_ID"] = "1111111111111111111"
+        os.environ[f"{ENV_PREFIX}PURPLE_AI_CONSOLE_TENANT_ID"] = "2222222222222222222"
+        os.environ[f"{ENV_PREFIX}PURPLE_AI_CONSOLE_ACCOUNT_ID"] = "3333333333333333333"
+        os.environ[f"{ENV_PREFIX}PURPLE_AI_CONSOLE_SITE_ID"] = "4444444444444444444"
         os.environ[f"{ENV_PREFIX}CONSOLE_BASE_URL"] = "https://console.test"
         os.environ[f"{ENV_PREFIX}PURPLE_AI_CONSOLE_VERSION"] = "1.0.0"
         os.environ[f"{ENV_PREFIX}CONSOLE_TOKEN"] = "Bearer test-graphql-token"
@@ -300,7 +302,7 @@ class TestPurpleAIRealClient:
         os.environ.update(original_env)
 
         # Clear settings cache again to ensure subsequent tests don't see our test config
-        get_settings.cache_clear()
+        _load_base_settings.cache_clear()
 
     @pytest.mark.asyncio
     async def test_purple_ai_real_client_message_response(
@@ -407,11 +409,30 @@ class TestPurpleAIRealClient:
         assert "variables" in request_json
         assert request_json["variables"].get("input") == "test security query"
 
-        # Verify configuration values are included in the GraphQL query
-        assert "test-account-123" in request_json["query"]
         # Verify console base URL is properly included in the query
         assert "baseUrl" in request_json["query"]
         assert "console.test" in request_json["query"]
+        assert "consoleId:" in request_json["query"]
+
+        # Nested tenantDetails must be present and all scope IDs flow through
+        assert "tenantDetails:" in request_json["query"]
+        assert '"1111111111111111111"' in request_json["query"]  # consoleId
+        assert '"2222222222222222222"' in request_json["query"]  # tenantId
+        assert '"3333333333333333333"' in request_json["query"]  # accountId
+        assert '"4444444444444444444"' in request_json["query"]  # siteId
+
+        # userId is never emitted - purple-server reconciles it from the AuthN token.
+        assert "userId" not in request_json["query"]
+
+        # teamToken is the only permanently removed field; the user/console
+        # metadata fields remain part of the nested schema.
+        assert "teamToken:" not in request_json["query"], (
+            "Legacy field 'teamToken:' should not appear in nested-schema request"
+        )
+        for field in ("emailAddress:", "buildDate:", "buildHash:", "version:"):
+            assert field in request_json["query"], (
+                f"Field {field!r} should appear in nested-schema request"
+            )
 
     @pytest.mark.asyncio
     async def test_purple_ai_real_client_includes_auth_header(

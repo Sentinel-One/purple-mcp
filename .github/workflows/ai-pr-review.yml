@@ -6,12 +6,13 @@ permissions:
 on:
   pull_request:
     branches: [main]
-  workflow_dispatch:
 
 concurrency:
   group: purple-mcp-ai-review-${{ github.head_ref || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+
   ai-pr-analysis:
     timeout-minutes: 30
     permissions:
@@ -20,26 +21,21 @@ jobs:
       pull-requests: write # Needed to post PR comments
     runs-on: ubuntu-latest
     container:
-      image: node:24-bookworm
+      image: node:24-trixie
       # tty is required here to enable codex to run non-interactively
       options: --tty
-    env:
-      SMG_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Install tools
         shell: bash
         run: |
           set -euo pipefail
           IFS=$'\n\t'
-          apt-get update && apt-get install --no-install-recommends -y jq git curl bash ripgrep tree
-          # Install GitHub CLI
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          apt-get update && apt-get install --no-install-recommends -y gh
+          apt-get update && apt-get install --no-install-recommends -y jq gh git curl bash ripgrep tree
 
       - name: Add git safe directory
         shell: bash
@@ -116,16 +112,17 @@ jobs:
       - name: Run OpenAI analysis
         id: analysis
         env:
-          OPENAI_API_KEY: ${{ env.SMG_API_KEY || env.SMG_API_KEY_AWS }}
-          MODEL: gpt-5-codex
-          CODEX_VERSION: 0.53.0
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MODEL: gpt-5.1-codex-mini
+          CODEX_VERSION: 0.77.0
           AI_PROMPT: |
             You are an expert programmer with advanced code review skills. Your task is to analyze a GitHub pull request (PR) and produce a focused, high-impact review.
 
             Write your final report in GitHub-flavored markdown, saving it as 'report.txt'.
             Do not modify any other files. You do not need to add or commit 'report.txt' to git.
 
-            To identify the changes to review, use git commands to compare the current branch ('${{ github.head_ref }}') with the target branch ('origin/${{ github.base_ref }}'). You do not need to fetch any branches, as the repository has already been checked out with fetch-depth: 0. Use git commands (such as 'git log', 'git diff', and 'git blame') as needed to understand both the diff and the surrounding context.  Use a three-dot diff (git diff A...B) to compute the difference between a branch and its base (merge base), matching what GitHub PRs display. Do not use a two-dot diff (A..B), which compares tips directly and may include unrelated upstream changes.
+            To identify the changes to review, use git commands to compare the current branch ('${{ github.head_ref }}') with the target branch ('origin/${{ github.base_ref }}'). You do not need to fetch any branches, as the repository has already been checked out with fetch-depth: 0. Use git commands (such as 'git log', 'git diff', and 'git blame') as needed to understand both the diff and the surrounding context.
+            Use a three-dot diff (git diff A...B) to compute the difference between a branch and its base (merge base), matching what GitHub PRs display. Do not use a two-dot diff (A..B), which compares tips directly and may include unrelated upstream changes.”
 
             You can assume the current branch (${{ github.head_ref }}) is checked out already, do not waste effort on checking out ${{ github.head_ref }}.
 
@@ -200,7 +197,6 @@ jobs:
             -c model="$MODEL" \
             -c disable_response_storage="true" \
             --sandbox workspace-write
-
 
           if [ ! -s report.txt ] || [ -z "$(grep -v '^$' report.txt | tr -d '[:space:]')" ]; then
             echo >&2 "ERROR: report.txt is empty or only whitespace. Failing."

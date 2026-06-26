@@ -42,6 +42,7 @@ Dependencies:
 """
 
 import contextlib
+import logging
 from typing import Literal
 
 import fastmcp
@@ -62,6 +63,14 @@ from purple_mcp.tools.alerts import (
     get_alert_notes,
     list_alerts,
     search_alerts,
+)
+from purple_mcp.tools.cve import (
+    CVE_DATABASE_STATUS_DESCRIPTION,
+    CVE_SEARCH_BY_ID_DESCRIPTION,
+    CVE_SEARCH_BY_VENDOR_DESCRIPTION,
+    cve_database_status,
+    cve_search_by_id,
+    cve_search_by_vendor,
 )
 from purple_mcp.tools.inventory import (
     GET_INVENTORY_ITEM_DESCRIPTION,
@@ -91,6 +100,22 @@ from purple_mcp.tools.sdl import (
     get_timestamp_range,
     powerquery,
 )
+from purple_mcp.tools.threat_intelligence import (
+    THREAT_INTEL_BY_DOMAIN_DESCRIPTION,
+    THREAT_INTEL_BY_HASH_DESCRIPTION,
+    THREAT_INTEL_BY_IP_DESCRIPTION,
+    THREAT_INTEL_BY_URL_DESCRIPTION,
+    THREAT_INTEL_GET_FILE_BEHAVIOR_DESCRIPTION,
+    THREAT_INTEL_GET_FILE_RELATIONSHIPS_DESCRIPTION,
+    THREAT_INTEL_SEARCH_DESCRIPTION,
+    threat_intel_by_domain,
+    threat_intel_by_hash,
+    threat_intel_by_ip,
+    threat_intel_by_url,
+    threat_intel_get_file_behavior,
+    threat_intel_get_file_relationships,
+    threat_intel_search,
+)
 from purple_mcp.tools.vulnerabilities import (
     GET_VULNERABILITY_DESCRIPTION,
     GET_VULNERABILITY_HISTORY_DESCRIPTION,
@@ -103,6 +128,8 @@ from purple_mcp.tools.vulnerabilities import (
     list_vulnerabilities,
     search_vulnerabilities,
 )
+
+logger = logging.getLogger(__name__)
 
 # Initialize Pydantic Logfire observability if configured
 initialize_logfire()
@@ -132,6 +159,18 @@ app.tool(description=GET_VULNERABILITY_HISTORY_DESCRIPTION)(get_vulnerability_hi
 app.tool(description=GET_INVENTORY_ITEM_DESCRIPTION)(get_inventory_item)
 app.tool(description=LIST_INVENTORY_ITEMS_DESCRIPTION)(list_inventory_items)
 app.tool(description=SEARCH_INVENTORY_ITEMS_DESCRIPTION)(search_inventory_items)
+app.tool(description=THREAT_INTEL_BY_HASH_DESCRIPTION)(threat_intel_by_hash)
+app.tool(description=THREAT_INTEL_BY_URL_DESCRIPTION)(threat_intel_by_url)
+app.tool(description=THREAT_INTEL_BY_DOMAIN_DESCRIPTION)(threat_intel_by_domain)
+app.tool(description=THREAT_INTEL_BY_IP_DESCRIPTION)(threat_intel_by_ip)
+app.tool(description=THREAT_INTEL_GET_FILE_RELATIONSHIPS_DESCRIPTION)(
+    threat_intel_get_file_relationships
+)
+app.tool(description=THREAT_INTEL_SEARCH_DESCRIPTION)(threat_intel_search)
+app.tool(description=THREAT_INTEL_GET_FILE_BEHAVIOR_DESCRIPTION)(threat_intel_get_file_behavior)
+app.tool(description=CVE_SEARCH_BY_ID_DESCRIPTION)(cve_search_by_id)
+app.tool(description=CVE_SEARCH_BY_VENDOR_DESCRIPTION)(cve_search_by_vendor)
+app.tool(description=CVE_DATABASE_STATUS_DESCRIPTION)(cve_database_status)
 
 
 @app.custom_route("/health", methods=["GET"])
@@ -140,21 +179,17 @@ async def health_check(request: Request) -> JSONResponse:
     return JSONResponse({"status": "ok"})
 
 
-settings = None
-
-# Use get_settings to ensure usage of lru_cache decorator.
-with contextlib.suppress(Exception):
-    settings = get_settings()
-
-
 def get_http_app(
-    mcp_app: fastmcp.FastMCP[None], settings: Settings | None
+    mcp_app: fastmcp.FastMCP[None], settings: Settings | None = None
 ) -> StarletteWithLifespan:
-    """Returns a http_app using environment variable settings.
+    """Returns an http_app using environment variable settings.
 
     For stdio mode or when settings is None, defaults to SSE transport for the HTTP app.
     The stateless_http setting only applies to streamable-http and http transports.
     """
+    if settings is None:
+        with contextlib.suppress(Exception):
+            settings = get_settings()
     if settings and settings.transport_mode in ("streamable-http", "http"):
         # Type narrowing: transport_mode is "streamable-http" or "http" here
         transport: Literal["http", "streamable-http"] = (
@@ -164,7 +199,7 @@ def get_http_app(
     return mcp_app.http_app(transport="sse")
 
 
-http_app = get_http_app(app, settings)
+http_app = get_http_app(app)
 
 # Instrument the Starlette app with Logfire if enabled
 instrument_starlette_app(http_app)

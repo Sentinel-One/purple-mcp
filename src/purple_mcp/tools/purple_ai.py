@@ -47,7 +47,7 @@ Raises:
 from textwrap import dedent
 from typing import Final
 
-from purple_mcp.config import get_settings
+from purple_mcp.config import get_settings, validate_request_credentials
 from purple_mcp.libs.purple_ai import (
     PurpleAIClientError,
     PurpleAIConfig,
@@ -100,7 +100,6 @@ PURPLE_AI_DESCRIPTION: Final[str] = dedent(
     - Add specific entities like: powershell, svchost, lolbins, ssh, .tmp files
     - Use filters like: external IPs, non-Windows folders, file size over 1GB
     - Ask about behaviors: ransomware, persistence, privilege escalation, data staging, beaconing, phishing
-    - If you want a PowerQuery, specifically say "generate a powerquery for " -> Example: "Generate a PowerQuery to detect Wizard Spider threat group indicators"
     """
 ).strip()
 
@@ -126,9 +125,14 @@ async def purple_ai(query: str) -> str:
             f"Settings not initialized. Please check your environment configuration. Error: {e}"
         ) from e
 
+    # Validate credentials are available
+    validate_request_credentials(settings)
+
+    # After validation, credentials are guaranteed to be non-None
+    assert settings.sentinelone_console_base_url is not None
+    assert settings.graphql_service_token is not None
+
     user_details = PurpleAIUserDetails(
-        account_id=settings.purple_ai_account_id,
-        team_token=settings.purple_ai_team_token,
         session_id=settings.purple_ai_session_id,
         email_address=settings.purple_ai_email_address,
         user_agent=settings.purple_ai_user_agent,
@@ -137,6 +141,10 @@ async def purple_ai(query: str) -> str:
     )
 
     console_details = PurpleAIConsoleDetails(
+        console_id=settings.purple_ai_console_id,
+        tenant_id=settings.purple_ai_console_tenant_id,
+        account_id=settings.purple_ai_console_account_id,
+        site_id=settings.purple_ai_console_site_id,
         base_url=settings.sentinelone_console_base_url,
         version=settings.purple_ai_console_version,
     )

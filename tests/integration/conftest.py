@@ -92,9 +92,9 @@ def integration_settings(integration_env_check: dict[str, str]) -> Generator[Non
     """Ensure settings are properly configured for integration tests."""
     # Clear any cached settings from unit tests
     try:
-        from purple_mcp.config import get_settings
+        from purple_mcp.config import _load_base_settings
 
-        get_settings.cache_clear()
+        _load_base_settings.cache_clear()
     except ImportError:
         pass
 
@@ -102,9 +102,9 @@ def integration_settings(integration_env_check: dict[str, str]) -> Generator[Non
 
     # Clean up after test
     try:
-        from purple_mcp.config import get_settings
+        from purple_mcp.config import _load_base_settings
 
-        get_settings.cache_clear()
+        _load_base_settings.cache_clear()
     except ImportError:
         pass
 

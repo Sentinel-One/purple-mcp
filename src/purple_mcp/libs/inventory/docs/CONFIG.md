@@ -2,16 +2,19 @@
 
 Configuration options and setup for the Inventory Library.
 
-> **📖 Read-Only Library**: This library provides read-only access to the Unified Asset Inventory system. Configuration settings apply to all usage contexts, supporting data retrieval operations only.
+> **📖 Read-Only Library**: This library provides read-only access to the Unified Asset Inventory
+> system. Configuration settings apply to all usage contexts, supporting data retrieval operations
+> only.
 
 ## Basic Configuration
 
 ### Required Settings
+
 ```python
 from purple_mcp.libs.inventory import InventoryConfig
 
 config = InventoryConfig(
-    base_url="https://console.example.com",
+    base_url="https://console.sentinelone.net",
     api_endpoint="/web/api/v2.1/xdr/assets",
     api_token="your-bearer-token"
 )
@@ -20,16 +23,20 @@ config = InventoryConfig(
 ### Configuration Parameters
 
 #### `base_url` (required)
+
 Base URL of the SentinelOne console.
 
 **Format:** `https://{console_domain}`
 
 **Examples:**
+
 - `https://your-console.sentinelone.net`
 
-**Note:** Do not include the API endpoint path in the base_url. The API endpoint is configured separately.
+**Note:** Do not include the API endpoint path in the base_url. The API endpoint is configured
+separately.
 
 #### `api_endpoint` (required)
+
 API endpoint path for the inventory API.
 
 **Example value:** `/web/api/v2.1/xdr/assets`
@@ -38,16 +45,18 @@ API endpoint path for the inventory API.
 
 ```python
 config = InventoryConfig(
-    base_url="https://console.example.com",
+    base_url="https://console.sentinelone.net",
     api_endpoint="/web/api/v2.1/xdr/assets",
     api_token="your-token"
 )
 ```
 
 #### `api_token` (required)
+
 Bearer token for API authentication. Must have appropriate permissions for inventory operations.
 
 **How to get:**
+
 1. Log into your SentinelOne console
 2. Go to Policy & Settings → Service Users
 3. Create a new service user with inventory read permissions
@@ -56,6 +65,7 @@ Bearer token for API authentication. Must have appropriate permissions for inven
 ## Environment-Based Configuration
 
 ### Environment Variables
+
 While the library uses programmatic configuration, you can load from environment variables:
 
 ```python
@@ -73,6 +83,7 @@ config = create_config_from_env()
 ```
 
 ### Configuration Validation
+
 The library validates configuration at multiple levels:
 
 ```python
@@ -82,7 +93,7 @@ from purple_mcp.libs.inventory.exceptions import InventoryAPIError
 # 1. Pydantic validates required fields at instantiation
 try:
     config = InventoryConfig(
-        base_url="https://console.example.com"
+        base_url="https://console.sentinelone.net"
         # Missing api_endpoint and api_token - raises ValidationError
     )
 except ValidationError as e:
@@ -105,28 +116,31 @@ except InventoryAPIError as e:
 
 ## Configuration Examples
 
-### Production Configuration
+### Release Configuration
+
 ```python
-production_config = InventoryConfig(
-    base_url="https://production-console.company.com",
+release_config = InventoryConfig(
+    base_url="https://console.sentinelone.net",
     api_endpoint="/web/api/v2.1/xdr/assets",
-    api_token=os.getenv("PRODUCTION_INVENTORY_TOKEN")
+    api_token=os.getenv("PROD_INVENTORY_TOKEN")
 )
 ```
 
 ### Development Configuration
+
 ```python
 dev_config = InventoryConfig(
-    base_url="https://dev-console.company.com",
+    base_url="https://console.sentinelone.net",
     api_endpoint="/web/api/v2.1/xdr/assets",
     api_token=os.getenv("DEV_INVENTORY_TOKEN")
 )
 ```
 
 ### High-Volume Configuration
+
 ```python
 high_volume_config = InventoryConfig(
-    base_url="https://console.example.com",
+    base_url="https://console.sentinelone.net",
     api_endpoint="/web/api/v2.1/xdr/assets",
     api_token=os.getenv("INVENTORY_TOKEN")
 )
@@ -137,27 +151,29 @@ high_volume_config = InventoryConfig(
 ### Common Configuration Errors
 
 #### Invalid URL Format
+
 ```python
 # ❌ Wrong
 config = InventoryConfig(
-    base_url="console.example.com",  # Missing protocol
+    base_url="console.sentinelone.net",  # Missing protocol
     api_endpoint="/web/api/v2.1/xdr/assets",
     api_token="token"
 )
 
 # ✅ Correct
 config = InventoryConfig(
-    base_url="https://console.example.com",
+    base_url="https://console.sentinelone.net",
     api_endpoint="/web/api/v2.1/xdr/assets",
     api_token="token"
 )
 ```
 
 #### Including API Endpoint in Base URL
+
 ```python
 # ❌ Wrong
 config = InventoryConfig(
-    base_url="https://console.example.com/web/api/v2.1/xdr/assets",  # Too specific
+    base_url="https://console.sentinelone.net/web/api/v2.1/xdr/assets",  # Too specific
     api_endpoint="/web/api/v2.1/xdr/assets",
     api_token="token"
 )
@@ -171,6 +187,7 @@ config = InventoryConfig(
 ```
 
 #### Missing Required Fields
+
 ```python
 # ❌ Wrong
 config = InventoryConfig(
@@ -187,6 +204,7 @@ config = InventoryConfig(
 ```
 
 ### Testing Configuration
+
 ```python
 async def test_configuration(config: InventoryConfig):
     """Test if configuration is working."""
@@ -211,6 +229,7 @@ async def test_configuration(config: InventoryConfig):
 ```
 
 ### Debug Logging
+
 Enable debug logging to see configuration and request details:
 
 ```python
@@ -229,6 +248,7 @@ logging.getLogger("purple_mcp.libs.inventory").setLevel(logging.DEBUG)
 ## Advanced Configuration
 
 ### Custom HTTP Client Settings
+
 The library uses httpx internally with these settings:
 
 ```python
@@ -239,6 +259,7 @@ The library uses httpx internally with these settings:
 ```
 
 ### Connection Pooling
+
 The library automatically manages HTTP connection pooling for efficiency:
 
 ```python
@@ -254,6 +275,7 @@ async with InventoryClient(config) as client:
 ## Security Considerations
 
 ### Token Security
+
 - Never hardcode API tokens in source code
 - Use environment variables or secure secret management
 - Rotate tokens regularly
@@ -276,7 +298,9 @@ config = InventoryConfig(
 ```
 
 ### SSL Verification
-The library always uses SSL verification. Do not disable SSL verification in production environments.
+
+The library always uses SSL verification. Do not disable SSL verification in release environments.
 
 ### Network Security
+
 Ensure the console URL is accessible from your network and appropriate firewall rules are in place.

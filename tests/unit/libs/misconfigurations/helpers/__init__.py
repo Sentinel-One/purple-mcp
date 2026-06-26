@@ -7,11 +7,8 @@ from unittest.mock import AsyncMock
 import pytest
 
 from purple_mcp.libs.misconfigurations import (
-    MisconfigurationConnection,
     MisconfigurationDetail,
-    MisconfigurationHistoryItemConnection,
     MisconfigurationNote,
-    MisconfigurationNoteConnection,
     PageInfo,
 )
 from purple_mcp.type_defs import JsonDict
@@ -225,7 +222,7 @@ class MisconfigurationsTestData:
             vendor="test-vendor",
             detected_at="2024-01-01T00:00:00Z",
             event_time="2024-01-01T00:00:00Z",
-            environment="production",
+            environment="testing",
             compliance=Compliance.model_construct(),
             remediation=Remediation.model_construct(),
             finding_data=FindingData.model_construct(),

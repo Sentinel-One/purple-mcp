@@ -189,10 +189,10 @@ def install_filter() -> SecretFilter:
         logging.getLogger().addFilter(_filter)
 
         # Monkey-patch getMessage to redact secrets after formatting
-        logging.LogRecord.getMessage = _redacting_get_message
+        logging.LogRecord.getMessage = _redacting_get_message  # type: ignore[method-assign]
 
         # Monkey-patch formatException to redact secrets from tracebacks
-        logging.Formatter.formatException = _redacting_format_exception
+        logging.Formatter.formatException = _redacting_format_exception  # type: ignore[method-assign]
 
         # Register any secrets that were queued before filter installation
         for secret in _pending_secrets:

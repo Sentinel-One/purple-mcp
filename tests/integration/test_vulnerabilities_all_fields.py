@@ -14,11 +14,15 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-def vuln_config() -> VulnerabilitiesConfig:
+def vuln_config(integration_settings: None) -> VulnerabilitiesConfig:
     """Create VulnerabilitiesConfig for integration tests."""
     from purple_mcp.config import get_settings
 
     settings = get_settings()
+
+    # Ensure required credentials are not None for integration tests
+    assert settings.graphql_service_token is not None
+
     return VulnerabilitiesConfig(
         graphql_url=settings.vulnerabilities_graphql_url,
         auth_token=settings.graphql_service_token,

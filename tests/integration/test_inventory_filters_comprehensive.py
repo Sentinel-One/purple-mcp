@@ -34,6 +34,10 @@ def inventory_config(integration_env_check: dict[str, str]) -> InventoryConfig:
     """
     settings = get_settings()
 
+    # Ensure required credentials are not None for integration tests
+    assert settings.sentinelone_console_base_url is not None
+    assert settings.graphql_service_token is not None
+
     return InventoryConfig(
         base_url=settings.sentinelone_console_base_url,
         api_endpoint=settings.sentinelone_inventory_restapi_endpoint,
@@ -146,7 +150,7 @@ class TestContainsFilters:
     @pytest.mark.integration
     async def test_filter_name_contains_single(self, inventory_client: InventoryClient) -> None:
         """Test filtering by name containing single term."""
-        filters = {"name__contains": ["prod"]}
+        filters = {"name__contains": ["test"]}
 
         async with inventory_client:
             result = await inventory_client.search_inventory(filters=filters, limit=5)
@@ -157,7 +161,7 @@ class TestContainsFilters:
     @pytest.mark.integration
     async def test_filter_name_contains_multiple(self, inventory_client: InventoryClient) -> None:
         """Test filtering by name containing multiple terms."""
-        filters = {"name__contains": ["prod", "production", "server"]}
+        filters = {"name__contains": ["test", "testing", "server"]}
 
         async with inventory_client:
             result = await inventory_client.search_inventory(filters=filters, limit=5)
@@ -170,7 +174,7 @@ class TestContainsFilters:
         self, inventory_client: InventoryClient
     ) -> None:
         """Test filtering by cloud provider account name containing term."""
-        filters = {"cloudProviderAccountName__contains": ["production"]}
+        filters = {"cloudProviderAccountName__contains": ["testing"]}
 
         async with inventory_client:
             result = await inventory_client.search_inventory(filters=filters, limit=5)
@@ -273,7 +277,7 @@ class TestFilterCombinations:
     @pytest.mark.integration
     async def test_standard_and_contains_filters(self, inventory_client: InventoryClient) -> None:
         """Test combination of standard and contains filters."""
-        filters = {"assetStatus": ["Active"], "name__contains": ["prod"]}
+        filters = {"assetStatus": ["Active"], "name__contains": ["test"]}
 
         async with inventory_client:
             result = await inventory_client.search_inventory(filters=filters, limit=5)
@@ -304,7 +308,7 @@ class TestFilterCombinations:
         filters = {
             "category": ["Server"],
             "assetStatus": ["Active"],
-            "name__contains": ["prod"],
+            "name__contains": ["test"],
         }
 
         async with inventory_client:
@@ -316,7 +320,7 @@ class TestFilterCombinations:
     @pytest.mark.integration
     async def test_contains_multiple_fields(self, inventory_client: InventoryClient) -> None:
         """Test multiple contains filters on different fields."""
-        filters = {"name__contains": ["server", "prod"]}
+        filters = {"name__contains": ["server", "test"]}
 
         async with inventory_client:
             result = await inventory_client.search_inventory(filters=filters, limit=5)

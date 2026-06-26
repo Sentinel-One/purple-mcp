@@ -4,7 +4,9 @@ A Python library for interacting with SentinelOne's Purple AI assistant through 
 
 ## Overview
 
-This library provides both async and sync interfaces for asking questions to Purple AI, SentinelOne's cybersecurity AI assistant. It handles authentication, conversation management, and response parsing.
+This library provides both async and sync interfaces for asking questions to Purple AI,
+SentinelOne's cybersecurity AI assistant. It handles authentication, conversation management, and
+response parsing.
 
 ## Installation
 
@@ -29,17 +31,11 @@ async def main():
         graphql_url="https://your-console.sentinelone.net/web/api/v2.1/graphql",
         auth_token="your-service-token",
         user_details=PurpleAIUserDetails(
-            account_id="your-account-id",
-            team_token="your-team-token",
-            session_id="your-session-id",
-            email_address="user@example.com",
+            session_id="abc123",
             user_agent="PurpleAI-Client/1.0",
-            build_date="2024-01-01",
-            build_hash="abc123",
         ),
         console_details=PurpleAIConsoleDetails(
             base_url="https://your-console.sentinelone.net",
-            version="1.0.0",
         ),
     )
 
@@ -56,7 +52,7 @@ asyncio.run(main())
 ## Documentation
 
 - **[Usage Guide](docs/USAGE.md)** - Comprehensive usage examples and patterns
-- **[API Reference](docs/API.md)** - Complete API documentation  
+- **[API Reference](docs/API.md)** - Complete API documentation
 - **[Configuration](docs/CONFIG.md)** - Configuration options and setup
 
 ## Key Features
@@ -71,13 +67,16 @@ asyncio.run(main())
 ## Response Types
 
 Purple AI can return two types of responses:
+
 - **MESSAGE**: Direct text responses with analysis and recommendations
 - **POWER_QUERY**: SDL PowerQuery code for further data analysis
 
 ## Authentication
 
-The library requires a SentinelOne console service token with appropriate permissions to access the Purple AI GraphQL endpoint.
+The library requires a SentinelOne console service token with appropriate permissions to access the
+Purple AI GraphQL endpoint.
 
 ## Contributing
 
-This library follows the purple-mcp project's contribution guidelines. See the main project's CONTRIBUTING.md for details.
+This library follows the purple-mcp project's contribution guidelines. See the main project's
+CONTRIBUTING.md for details.

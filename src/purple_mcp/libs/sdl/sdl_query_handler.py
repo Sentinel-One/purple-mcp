@@ -48,7 +48,6 @@ import asyncio
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from timeit import default_timer
-from typing import cast
 
 from httpx import Headers
 
@@ -155,6 +154,7 @@ class SDLHandler(ABC):
         account_ids: list[str] | None = None,
         query_priority: SDLQueryPriority = SDLQueryPriority.LOW,
         pq: SDLPQAttributes | None = None,
+        query_origin: str | None = None,
         headers: Headers | None = None,
     ) -> None:
         """Launch SDL query.
@@ -166,6 +166,7 @@ class SDLHandler(ABC):
             account_ids: The account IDs for the query.
             query_priority: The priority for the query.
             pq: The PQ attributes for the query.
+            query_origin: Optional query origin for SDL provenance tracking.
             headers: Additional headers for the request.
         """
         self._ensure_client_open()
@@ -185,6 +186,7 @@ class SDLHandler(ABC):
                 account_ids=account_ids,
                 query_priority=query_priority,
                 pq=pq,
+                query_origin=query_origin,
                 headers=headers,
             )
         except Exception as exc:
@@ -242,12 +244,13 @@ class SDLHandler(ABC):
             )
 
         try:
-            # Mypy can not infer the types correctly here, so we cast them to str. Note the
-            # above checks ensure that these are not None.
+            # ignore[arg-type] as mypy cannot infer the types correctly
+            # here. Note the above checks ensure that these are not
+            # None.
             response = await self.sdl_query_client.ping_query(
                 auth_token=self.auth_token,
-                query_id=cast(str, self.query_id),
-                x_dataset_query_forward_tag=cast(str, self.x_dataset_query_forward_tag),
+                query_id=self.query_id,  # type: ignore[arg-type]
+                x_dataset_query_forward_tag=self.x_dataset_query_forward_tag,  # type: ignore[arg-type]
                 last_step_seen=self.last_step_seen,
                 headers=headers,
             )
@@ -348,12 +351,12 @@ class SDLHandler(ABC):
             )
 
         try:
-            # Mypy can not infer the types correctly here, so we cast them to str. Note the
-            # above checks ensure that these are not None.
+            # ignore[arg-type] as mypy cannot infer the types correctly
+            # here. Note the above checks ensure that these are not None.
             return await self.sdl_query_client.delete_query(
                 auth_token=self.auth_token,
-                query_id=cast(str, self.query_id),
-                x_dataset_query_forward_tag=cast(str, self.x_dataset_query_forward_tag),
+                query_id=self.query_id,  # type: ignore[arg-type]
+                x_dataset_query_forward_tag=self.x_dataset_query_forward_tag,  # type: ignore[arg-type]
                 headers=headers,
             )
         except Exception as exc:

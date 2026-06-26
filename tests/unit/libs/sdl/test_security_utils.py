@@ -9,10 +9,12 @@ from pytest import LogCaptureFixture
 
 from purple_mcp.libs.sdl.security import (
     DEVELOPMENT_ENVIRONMENTS,
-    FORBIDDEN_PRODUCTION_ENVIRONMENTS,
+    RELEASE_ENVIRONMENTS,
+    TESTING_ENVIRONMENTS,
     get_security_context,
     is_development_environment,
-    is_production_environment,
+    is_non_release_environment,
+    is_release_environment,
     log_tls_bypass_initialization,
     log_tls_bypass_request,
     validate_security_configuration,
@@ -32,28 +34,29 @@ def isolated_security_warnings() -> Generator[list[warnings.WarningMessage], Non
 class TestEnvironmentDetection:
     """Test environment detection functions."""
 
-    @pytest.mark.parametrize("env_value", FORBIDDEN_PRODUCTION_ENVIRONMENTS)
-    def test_is_production_environment_true(self, env_value: str) -> None:
-        """Test is_production_environment correctly identifies production environments."""
-        assert is_production_environment(env_value) is True
+    @pytest.mark.parametrize("env_value", RELEASE_ENVIRONMENTS)
+    def test_is_release_environment_true(self, env_value: str) -> None:
+        """Test is_release_environment correctly identifies release environments."""
+        assert is_release_environment(env_value) is True
 
-    @pytest.mark.parametrize("env_value", ["development", "staging", "test", "custom"])
-    def test_is_production_environment_false(self, env_value: str) -> None:
-        """Test is_production_environment correctly identifies non-production environments."""
-        assert is_production_environment(env_value) is False
+    @pytest.mark.parametrize("env_value", ["development", "staging", "test", "testing", "custom"])
+    def test_is_release_environment_false(self, env_value: str) -> None:
+        """Test is_release_environment correctly identifies non-release environments."""
+        assert is_release_environment(env_value) is False
 
-    def test_is_production_environment_explicit_parameter(self) -> None:
-        """Test is_production_environment with explicit parameter."""
-        assert is_production_environment("production") is True
-        assert is_production_environment("development") is False
-        assert is_production_environment("PROD") is True
+    def test_is_release_environment_explicit_parameter(self) -> None:
+        """Test is_release_environment with explicit parameter."""
+        assert is_release_environment("release") is True
+        assert is_release_environment("production") is True
+        assert is_release_environment("development") is False
+        assert is_release_environment("PROD") is True
 
     @pytest.mark.parametrize("env_value", DEVELOPMENT_ENVIRONMENTS)
     def test_is_development_environment_true(self, env_value: str) -> None:
         """Test is_development_environment correctly identifies development environments."""
         assert is_development_environment(env_value) is True
 
-    @pytest.mark.parametrize("env_value", ["production", "staging", "custom"])
+    @pytest.mark.parametrize("env_value", ["release", "production", "staging", "custom"])
     def test_is_development_environment_false(self, env_value: str) -> None:
         """Test is_development_environment correctly identifies non-development environments."""
         assert is_development_environment(env_value) is False
@@ -62,7 +65,35 @@ class TestEnvironmentDetection:
         """Test is_development_environment with explicit parameter."""
         assert is_development_environment("development") is True
         assert is_development_environment("production") is False
-        assert is_development_environment("TEST") is True
+        assert is_development_environment("release") is False
+        assert is_development_environment("TEST") is False
+
+    @pytest.mark.parametrize(
+        "env_value",
+        ["development", "dev", "testing", "test", "staging", "stage"],
+    )
+    def test_is_non_release_environment_true(self, env_value: str) -> None:
+        """Test is_non_release_environment correctly identifies non-release environments."""
+        assert is_non_release_environment(env_value) is True
+
+    @pytest.mark.parametrize("env_value", RELEASE_ENVIRONMENTS)
+    def test_is_non_release_environment_false(self, env_value: str) -> None:
+        """Test is_non_release_environment correctly identifies release environments."""
+        assert is_non_release_environment(env_value) is False
+
+    def test_is_non_release_environment_explicit_parameter(self) -> None:
+        """Test is_non_release_environment with explicit parameter."""
+        assert is_non_release_environment("development") is True
+        assert is_non_release_environment("dev") is True
+        assert is_non_release_environment("testing") is True
+        assert is_non_release_environment("test") is True
+        assert is_non_release_environment("staging") is True
+        assert is_non_release_environment("stage") is True
+        assert is_non_release_environment("release") is False
+        assert is_non_release_environment("production") is False
+        assert is_non_release_environment("prod") is False
+        assert is_non_release_environment("TEST") is True  # case insensitive
+        assert is_non_release_environment("STAGING") is True  # case insensitive
 
 
 class TestTLSBypassConfigValidation:
@@ -92,27 +123,31 @@ class TestTLSBypassConfigValidation:
         assert "TLS certificate verification is DISABLED" in caplog.text
         assert "CRITICAL SECURITY RISK" in caplog.text
 
-    def test_validate_tls_bypass_config_production_forbidden(self) -> None:
-        """Test TLS bypass is forbidden in production."""
+    def test_validate_tls_bypass_config_release_forbidden(self) -> None:
+        """Test TLS bypass is forbidden in release environments."""
         with pytest.raises(ValueError) as exc_info:
-            validate_tls_bypass_config(True, "production")
+            validate_tls_bypass_config(True, "release")
 
-        assert "TLS verification bypass is FORBIDDEN in production" in str(exc_info.value)
+        assert "TLS verification bypass is FORBIDDEN in release environments" in str(
+            exc_info.value
+        )
 
     def test_validate_tls_bypass_config_prod_environment_forbidden(self) -> None:
         """Test TLS bypass is forbidden in 'prod' environment."""
         with pytest.raises(ValueError) as exc_info:
             validate_tls_bypass_config(True, "prod")
 
-        assert "TLS verification bypass is FORBIDDEN in production" in str(exc_info.value)
+        assert "TLS verification bypass is FORBIDDEN in release environments" in str(
+            exc_info.value
+        )
 
-    def test_validate_tls_bypass_config_staging_additional_warnings(
+    def test_validate_tls_bypass_config_testing_additional_warnings(
         self,
         isolated_security_warnings: list[warnings.WarningMessage],
         caplog: LogCaptureFixture,
     ) -> None:
         """Test additional warnings in non-development environments."""
-        validate_tls_bypass_config(True, "staging")
+        validate_tls_bypass_config(True, "testing")
 
         # Should still issue security warning
         assert len(isolated_security_warnings) == 1
@@ -163,15 +198,15 @@ class TestTLSBypassClientValidation:
         assert hasattr(client_record, "environment")
         assert client_record.environment == "development"
 
-    def test_validate_tls_bypass_client_production_forbidden(self) -> None:
-        """Test TLS bypass client validation is forbidden in production."""
+    def test_validate_tls_bypass_client_release_forbidden(self) -> None:
+        """Test TLS bypass client validation is forbidden in release environments."""
         with pytest.raises(ValueError) as exc_info:
-            validate_tls_bypass_client(True, "https://example.test", "production")
+            validate_tls_bypass_client(True, "https://example.test", "release")
 
         error_msg = str(exc_info.value)
         assert "SECURITY ERROR" in error_msg
-        assert "TLS verification bypass is FORBIDDEN in production" in error_msg
-        assert "Current environment: production" in error_msg
+        assert "TLS verification bypass is FORBIDDEN in release environments" in error_msg
+        assert "Current environment: release" in error_msg
 
 
 class TestTLSBypassLogging:
@@ -222,30 +257,30 @@ class TestTLSBypassLogging:
 class TestSecurityContext:
     """Test security context functions."""
 
-    def test_get_security_context_development(self) -> None:
+    def test_get_security_context_dev_env(self) -> None:
         """Test security context in development environment."""
         context = get_security_context("development")
 
         assert context["environment"] == "development"
-        assert context["is_production"] == "false"
+        assert context["is_release"] == "false"
         assert context["is_development"] == "true"
         assert context["tls_bypass_allowed"] == "true"
 
-    def test_get_security_context_production(self) -> None:
-        """Test security context in production environment."""
-        context = get_security_context("production")
+    def test_get_security_context_release_env(self) -> None:
+        """Test security context in release environment."""
+        context = get_security_context("release")
 
-        assert context["environment"] == "production"
-        assert context["is_production"] == "true"
+        assert context["environment"] == "release"
+        assert context["is_release"] == "true"
         assert context["is_development"] == "false"
         assert context["tls_bypass_allowed"] == "false"
 
-    def test_get_security_context_staging(self) -> None:
-        """Test security context in staging environment."""
-        context = get_security_context("staging")
+    def test_get_security_context_testing_env(self) -> None:
+        """Test security context in testing environment."""
+        context = get_security_context("testing")
 
-        assert context["environment"] == "staging"
-        assert context["is_production"] == "false"
+        assert context["environment"] == "testing"
+        assert context["is_release"] == "false"
         assert context["is_development"] == "false"
         assert context["tls_bypass_allowed"] == "true"
 
@@ -266,12 +301,12 @@ class TestSecurityContext:
         assert env_record.environment == "development"
 
         prod_env_record = next(
-            (rec for rec in caplog.records if "Production Environment configured" in rec.message),
+            (rec for rec in caplog.records if "Release Environment configured" in rec.message),
             None,
         )
         assert prod_env_record is not None
-        assert hasattr(prod_env_record, "is_production")
-        assert prod_env_record.is_production == "false"
+        assert hasattr(prod_env_record, "is_release")
+        assert prod_env_record.is_release == "false"
 
         dev_env_record = next(
             (rec for rec in caplog.records if "Development Environment configured" in rec.message),
@@ -288,13 +323,13 @@ class TestSecurityContext:
         assert hasattr(tls_record, "tls_bypass_allowed")
         assert tls_record.tls_bypass_allowed == "true"
 
-        assert "Non-production environment - TLS bypass allowed with warnings" in caplog.text
+        assert "Non-release environment - TLS bypass allowed with warnings" in caplog.text
 
-    def test_validate_security_configuration_production(self, caplog: LogCaptureFixture) -> None:
-        """Test security configuration validation in production."""
+    def test_validate_security_configuration_release(self, caplog: LogCaptureFixture) -> None:
+        """Test security configuration validation in release environments."""
         caplog.set_level(logging.INFO)
 
-        validate_security_configuration("production")
+        validate_security_configuration("release")
 
         assert "SDL Security Configuration:" in caplog.text
 
@@ -304,15 +339,15 @@ class TestSecurityContext:
         )
         assert env_record is not None
         assert hasattr(env_record, "environment")
-        assert env_record.environment == "production"
+        assert env_record.environment == "release"
 
         prod_env_record = next(
-            (rec for rec in caplog.records if "Production Environment configured" in rec.message),
+            (rec for rec in caplog.records if "Release Environment configured" in rec.message),
             None,
         )
         assert prod_env_record is not None
-        assert hasattr(prod_env_record, "is_production")
-        assert prod_env_record.is_production == "true"
+        assert hasattr(prod_env_record, "is_release")
+        assert prod_env_record.is_release == "true"
 
         dev_env_record = next(
             (rec for rec in caplog.records if "Development Environment configured" in rec.message),
@@ -329,34 +364,41 @@ class TestSecurityContext:
         assert hasattr(tls_record, "tls_bypass_allowed")
         assert tls_record.tls_bypass_allowed == "false"
 
-        assert "Production environment detected - TLS bypass is FORBIDDEN" in caplog.text
+        assert "Release environment detected - TLS bypass is FORBIDDEN" in caplog.text
 
 
 class TestSecurityConstants:
     """Test security-related constants and edge cases."""
 
-    def test_forbidden_production_environments_constant(self) -> None:
-        """Test that production environment constants are correct."""
-        assert "production" in FORBIDDEN_PRODUCTION_ENVIRONMENTS
-        assert "prod" in FORBIDDEN_PRODUCTION_ENVIRONMENTS
+    def test_forbidden_release_environments_constant(self) -> None:
+        """Test that release environment constants are correct."""
+        assert "release" in RELEASE_ENVIRONMENTS
+        assert "production" in RELEASE_ENVIRONMENTS
+        assert "prod" in RELEASE_ENVIRONMENTS
 
     def test_development_environments_constant(self) -> None:
         """Test that development environment constants are correct."""
         assert "development" in DEVELOPMENT_ENVIRONMENTS
         assert "dev" in DEVELOPMENT_ENVIRONMENTS
-        assert "test" in DEVELOPMENT_ENVIRONMENTS
-        assert "testing" in DEVELOPMENT_ENVIRONMENTS
+
+    def test_testing_environments_constant(self) -> None:
+        """Test that testing environment constants are correct."""
+        assert "testing" in TESTING_ENVIRONMENTS
+        assert "test" in TESTING_ENVIRONMENTS
+        assert "staging" in TESTING_ENVIRONMENTS
+        assert "stage" in TESTING_ENVIRONMENTS
 
     def test_case_insensitive_environment_handling(self) -> None:
         """Test that environment handling is case insensitive."""
-        assert is_production_environment("PRODUCTION") is True
+        assert is_release_environment("RELEASE") is True
+        assert is_release_environment("PRODUCTION") is True
         assert is_development_environment("Development") is True
-        assert is_production_environment("PROD") is True
+        assert is_release_environment("PROD") is True
 
     def test_empty_environment_handling(self) -> None:
         """Test handling of empty environment variable."""
-        # Empty environment is not production or development
-        assert is_production_environment("") is False
+        # Empty environment is not release or development environments
+        assert is_release_environment("") is False
         assert is_development_environment("") is False
 
 
@@ -394,11 +436,11 @@ class TestSecurityIntegration:
         assert "Initializing HTTP client with TLS verification DISABLED" in caplog.text
         assert "TLS bypass request made" in caplog.text
 
-    def test_end_to_end_production_protection(self) -> None:
-        """Test complete production protection workflow."""
-        environment = "production"
+    def test_end_to_end_release_protection(self) -> None:
+        """Test complete release protection workflow."""
+        environment = "release"
 
-        # Security configuration should show production protection
+        # Security configuration should show release protection
         context = get_security_context(environment)
         assert context["tls_bypass_allowed"] == "false"
 
@@ -415,9 +457,10 @@ class TestSecurityIntegration:
         environments_to_test = [
             ("development", True, False),
             ("dev", True, False),
-            ("test", True, False),
-            ("testing", True, False),
+            ("test", False, False),
+            ("testing", False, False),
             ("production", False, True),
+            ("release", False, True),
             ("prod", False, True),
             ("staging", False, False),
             ("custom", False, False),
@@ -425,9 +468,9 @@ class TestSecurityIntegration:
 
         for env, should_be_dev, should_be_prod in environments_to_test:
             assert is_development_environment(env) == should_be_dev, f"Failed for {env}"
-            assert is_production_environment(env) == should_be_prod, f"Failed for {env}"
+            assert is_release_environment(env) == should_be_prod, f"Failed for {env}"
 
-            # TLS bypass should be forbidden only in production
+            # TLS bypass should be forbidden only in release environments
             if should_be_prod:
                 with pytest.raises(ValueError):
                     validate_tls_bypass_config(True, env)

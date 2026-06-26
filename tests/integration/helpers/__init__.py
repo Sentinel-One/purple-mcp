@@ -3,11 +3,9 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Any, ParamSpec, Protocol, TypedDict, TypeVar
+from typing import ParamSpec, Protocol, TypedDict, TypeVar
 
-import pytest
-
-from purple_mcp.libs.alerts import Alert, AlertConnection, AlertsClient, FilterInput, ViewType
+from purple_mcp.libs.alerts import Alert, AlertConnection, FilterInput
 from purple_mcp.type_defs import JsonDict
 
 T = TypeVar("T")
@@ -55,69 +53,6 @@ class IntegrationTestBase:
             return await asyncio.wait_for(coro, timeout=timeout)
         except TimeoutError:
             raise TimeoutError(error_message) from None
-
-    @staticmethod
-    async def assert_api_accessible(client: AlertsClient) -> None:
-        """Assert that the API is accessible.
-
-        Args:
-            client: AlertsClient instance
-
-        Raises:
-            AssertionError: If API is not accessible
-        """
-        try:
-            # Try a simple query
-            result = await client.list_alerts(first=1, view_type=ViewType.ALL)
-            assert result is not None, "API returned None response"
-        except Exception as e:
-            pytest.fail(f"API not accessible: {e}")
-
-    @staticmethod
-    async def get_test_alert_id(client: AlertsClient) -> str | None:
-        """Get a valid alert ID for testing.
-
-        Args:
-            client: AlertsClient instance
-
-        Returns:
-            Alert ID or None if no alerts available
-        """
-        try:
-            connection = await client.list_alerts(first=1, view_type=ViewType.ALL)
-            if connection and connection.edges:
-                return str(connection.edges[0].node.id)
-            return None
-        except Exception:
-            return None
-
-    @staticmethod
-    def assert_connection_valid(
-        connection: AlertConnection,
-        min_items: int | None = None,
-        max_items: int | None = None,
-    ) -> None:
-        """Assert that a connection response is valid.
-
-        Args:
-            connection: Connection response
-            min_items: Minimum expected items
-            max_items: Maximum expected items
-
-        Raises:
-            AssertionError: If connection is invalid
-        """
-        assert connection is not None, "Connection is None"
-        assert hasattr(connection, "edges"), "Connection missing edges"
-        assert hasattr(connection, "page_info"), "Connection missing page_info"
-
-        item_count = len(connection.edges)
-        if min_items is not None:
-            assert item_count >= min_items, (
-                f"Expected at least {min_items} items, got {item_count}"
-            )
-        if max_items is not None:
-            assert item_count <= max_items, f"Expected at most {max_items} items, got {item_count}"
 
     @staticmethod
     def create_timestamp_note(prefix: str = "Integration test") -> str:
@@ -214,45 +149,6 @@ class FilterTestHelper:
             FilterInput object
         """
         return FilterInput.create_string_equal("status", status, is_negated=negate)
-
-    @staticmethod
-    async def verify_filter_results(
-        client: AlertsClient,
-        filters: list[FilterInput],
-        expected_field: str,
-        expected_values: set[str],
-        sample_size: int = 10,
-    ) -> None:
-        """Verify that filter results match expectations.
-
-        Args:
-            client: AlertsClient instance
-            filters: Filters to apply
-            expected_field: Field to check in results
-            expected_values: Expected values for the field
-            sample_size: Number of results to check
-
-        Raises:
-            AssertionError: If results don't match expectations
-        """
-        result = await client.search_alerts(
-            filters=filters, first=sample_size, view_type=ViewType.ALL
-        )
-
-        if result and result.edges:
-            for edge in result.edges:
-                alert = edge.node
-                field_value = getattr(alert, expected_field, None)
-                if field_value:
-                    # Convert enum to string if needed
-                    if hasattr(field_value, "value"):
-                        field_value = field_value.value
-                    else:
-                        field_value = str(field_value)
-                    assert field_value in expected_values, (
-                        f"Alert {alert.id} has {expected_field}={field_value}, "
-                        f"expected one of {expected_values}"
-                    )
 
 
 class PerformanceTestHelper:

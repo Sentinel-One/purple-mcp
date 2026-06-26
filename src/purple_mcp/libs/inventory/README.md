@@ -4,9 +4,13 @@ A standalone Python library for interacting with the Unified Asset Inventory RES
 
 ## Overview
 
-This library provides a typed, async interface to the Unified Asset Inventory API, supporting multiple asset surfaces and comprehensive filtering capabilities. It's designed to be completely independent and can be used outside of the MCP context.
+This library provides a typed, async interface to the Unified Asset Inventory API, supporting
+multiple asset surfaces and comprehensive filtering capabilities. It's designed to be completely
+independent and can be used outside of the MCP context.
 
-> **📖 Read-Only Library**: This library provides read-only access to the Unified Asset Inventory system. It supports retrieving and searching inventory items, but does not include any data modification operations.
+> **📖 Read-Only Library**: This library provides read-only access to the Unified Asset Inventory
+> system. It supports retrieving and searching inventory items, but does not include any data
+> modification operations.
 
 ## Installation
 
@@ -16,7 +20,8 @@ pip install purple-mcp
 
 ## Quick Start
 
-> **Note**: This library is designed for read-only operations and works consistently across all usage contexts.
+> **Note**: This library is designed for read-only operations and works consistently across all
+> usage contexts.
 
 ```python
 import asyncio
@@ -24,7 +29,7 @@ from purple_mcp.libs.inventory import InventoryClient, InventoryConfig, Surface
 
 async def main():
     config = InventoryConfig(
-        base_url="https://console.example.com",
+        base_url="https://console.sentinelone.net",
         api_endpoint="/web/api/v2.1/xdr/assets",
         api_token="your-bearer-token"
     )
@@ -69,7 +74,8 @@ asyncio.run(main())
 - **Read-Only Design**: Safe, read-only access to inventory data
 - **Typed Interface**: Full type safety with pydantic models
 - **Multi-Surface Support**: Query across ENDPOINT, CLOUD, IDENTITY, and NETWORK_DISCOVERY surfaces
-- **Rich Filtering**: Support for complex REST API filters including contains, in, between operators
+- **Rich Filtering**: Support for complex REST API filters including contains, in, between
+  operators
 - **Pagination Support**: Built-in offset-based pagination
 - **Error Handling**: Comprehensive exception hierarchy
 - **Async/Await**: Native async support for efficient operations
@@ -99,7 +105,7 @@ response = await client.list_inventory()
 from purple_mcp.libs.inventory import InventoryConfig
 
 config = InventoryConfig(
-    base_url="https://console.example.com",
+    base_url="https://console.sentinelone.net",
     api_endpoint="/web/api/v2.1/xdr/assets",  # Required
     api_token="your-bearer-token"
 )
@@ -114,7 +120,7 @@ The library supports the REST API filter format:
 filters = {"resourceType": ["Windows Server", "Linux Server"]}
 
 # Field contains
-filters = {"name__contains": ["prod"]}
+filters = {"name__contains": ["test"]}
 
 # Field in list
 filters = {"id__in": ["id1", "id2", "id3"]}
@@ -137,22 +143,24 @@ filters = {
 
 ## Error Handling
 
-The library provides a structured exception hierarchy:
+The library provides a structured exception hierarchy. Note that the client returns `None` or empty
+`InventoryResponse` when resources are not found, rather than raising exceptions.
 
 ```python
 from purple_mcp.libs.inventory.exceptions import (
     InventoryAPIError,              # Base exception for all errors
     InventoryAuthenticationError,   # Authentication/authorization errors
-    InventoryNotFoundError,         # Resource not found errors
     InventoryNetworkError,          # Network connectivity errors
 )
 
 try:
     item = await client.get_inventory_item("123")
+    if item is None:
+        print("Item not found")
+    else:
+        print(f"Found item: {item.name}")
 except InventoryAuthenticationError:
     print("Check your API token")
-except InventoryNotFoundError:
-    print("Item not found")
 except InventoryNetworkError:
     print("Network connection failed")
 except InventoryAPIError as e:
@@ -161,4 +169,5 @@ except InventoryAPIError as e:
 
 ## Contributing
 
-This library follows the purple-mcp project's contribution guidelines. See the main project's CONTRIBUTING.md for details.
+This library follows the purple-mcp project's contribution guidelines. See the main project's
+CONTRIBUTING.md for details.

@@ -4,9 +4,11 @@ These tests verify that SDLTableResultData.to_df() correctly handles
 type conversions, preserves boolean dtypes, and handles edge cases.
 """
 
-from datetime import timezone
+from datetime import UTC
 
 import pandas as pd
+import pytest
+from pydantic import JsonValue
 
 from purple_mcp.libs.sdl.enums import PQColumnType
 from purple_mcp.libs.sdl.models import SDLColumn, SDLTableResultData
@@ -26,13 +28,13 @@ class TestSDLTableResultDataToDf:
             SDLColumn(name="is_active", type=PQColumnType.STRING),
             SDLColumn(name="name", type=PQColumnType.STRING),
         ]
-        values = [
+        values: list[list[JsonValue]] = [
             [True, "Alice"],
             [False, "Bob"],
             [True, "Charlie"],
         ]
 
-        result_data = SDLTableResultData(match_count=3, values=values, columns=columns)  # type: ignore[arg-type]
+        result_data = SDLTableResultData(match_count=3, values=values, columns=columns)
         df = result_data.to_df()
 
         # Verify boolean column preserves boolean dtype
@@ -56,13 +58,13 @@ class TestSDLTableResultDataToDf:
         ]
 
         # Use timestamps in seconds (10 digits) - the valid timestamps determine the unit
-        values = [
+        values: list[list[JsonValue]] = [
             [1609459200, "event1"],  # 2021-01-01
             [None, "event2"],
             [1640995200, "event3"],  # 2022-01-01
         ]
 
-        result_data = SDLTableResultData(match_count=3, values=values, columns=columns)  # type: ignore[arg-type]
+        result_data = SDLTableResultData(match_count=3, values=values, columns=columns)
         df = result_data.to_df()
 
         # Verify conversion succeeded and shape is correct
@@ -79,17 +81,17 @@ class TestSDLTableResultDataToDf:
         assert df["event_time"][0].startswith("2021-01-01T00:00:00")
         assert df["event_time"][2].startswith("2022-01-01T00:00:00")
 
-        # Verify None becomes NA in string column
-        assert pd.isna(df["event_time"][1])
+        # Verify None becomes empty string in timestamp column
+        assert df["event_time"][1] == ""
 
     def test_timestamp_precision_seconds(self) -> None:
         """Test timestamp conversion with second precision (10 digits)."""
         columns = [SDLColumn(name="timestamp", type=PQColumnType.TIMESTAMP)]
 
         # 10-digit timestamp (seconds): 2021-01-01 00:00:00 UTC
-        values = [[1609459200]]
+        values: list[list[JsonValue]] = [[1609459200]]
 
-        result_data = SDLTableResultData(match_count=1, values=values, columns=columns)  # type: ignore[arg-type]
+        result_data = SDLTableResultData(match_count=1, values=values, columns=columns)
         df = result_data.to_df()
 
         # Verify conversion succeeded and result is string
@@ -105,9 +107,9 @@ class TestSDLTableResultDataToDf:
         columns = [SDLColumn(name="timestamp", type=PQColumnType.TIMESTAMP)]
 
         # 13-digit timestamp (milliseconds): 2021-01-01 00:00:00.123 UTC
-        values = [[1609459200123]]
+        values: list[list[JsonValue]] = [[1609459200123]]
 
-        result_data = SDLTableResultData(match_count=1, values=values, columns=columns)  # type: ignore[arg-type]
+        result_data = SDLTableResultData(match_count=1, values=values, columns=columns)
         df = result_data.to_df()
 
         assert pd.api.types.is_string_dtype(df["timestamp"])
@@ -123,9 +125,9 @@ class TestSDLTableResultDataToDf:
         columns = [SDLColumn(name="timestamp", type=PQColumnType.TIMESTAMP)]
 
         # 16-digit timestamp (microseconds): 2021-01-01 00:00:00.123456 UTC
-        values = [[1609459200123456]]
+        values: list[list[JsonValue]] = [[1609459200123456]]
 
-        result_data = SDLTableResultData(match_count=1, values=values, columns=columns)  # type: ignore[arg-type]
+        result_data = SDLTableResultData(match_count=1, values=values, columns=columns)
         df = result_data.to_df()
 
         assert pd.api.types.is_string_dtype(df["timestamp"])
@@ -141,9 +143,9 @@ class TestSDLTableResultDataToDf:
         columns = [SDLColumn(name="timestamp", type=PQColumnType.TIMESTAMP)]
 
         # 19-digit timestamp (nanoseconds): 2021-01-01 00:00:00.123456789 UTC
-        values = [[1609459200123456789]]
+        values: list[list[JsonValue]] = [[1609459200123456789]]
 
-        result_data = SDLTableResultData(match_count=1, values=values, columns=columns)  # type: ignore[arg-type]
+        result_data = SDLTableResultData(match_count=1, values=values, columns=columns)
         df = result_data.to_df()
 
         assert pd.api.types.is_string_dtype(df["timestamp"])
@@ -162,12 +164,12 @@ class TestSDLTableResultDataToDf:
             SDLColumn(name="percentage", type=PQColumnType.PERCENTAGE),
         ]
 
-        values = [
+        values: list[list[JsonValue]] = [
             [1, "Alice", 95.5, 0.955],
             [2, "Bob", 87.3, 0.873],
         ]
 
-        result_data = SDLTableResultData(match_count=2, values=values, columns=columns)  # type: ignore[arg-type]
+        result_data = SDLTableResultData(match_count=2, values=values, columns=columns)
         df = result_data.to_df()
 
         # Verify numeric columns
@@ -183,30 +185,34 @@ class TestSDLTableResultDataToDf:
         assert df["name"].tolist() == ["Alice", "Bob"]
 
     def test_number_column_with_invalid_values(self) -> None:
-        """Test that NUMBER columns with invalid values use errors='coerce'."""
+        """Test that NUMBER columns with invalid values fall back to string type.
+
+        When a NUMBER column contains values that cannot be converted to numeric,
+        the entire column is converted to string type (errors='raise' behavior).
+        """
         columns = [
             SDLColumn(name="value", type=PQColumnType.NUMBER),
         ]
 
-        values = [
+        values: list[list[JsonValue]] = [
             [42],
             ["invalid"],
             [None],
             [99],
         ]
 
-        result_data = SDLTableResultData(match_count=4, values=values, columns=columns)  # type: ignore[arg-type]
+        result_data = SDLTableResultData(match_count=4, values=values, columns=columns)
         df = result_data.to_df()
 
-        # Verify numeric dtype
-        assert pd.api.types.is_numeric_dtype(df["value"])
+        # When invalid values are present, column falls back to string type
+        assert pd.api.types.is_string_dtype(df["value"])
 
-        # Verify valid values
-        assert df["value"][0] == 42
-        assert df["value"][3] == 99
+        # Verify values are converted to strings
+        assert df["value"][0] == "42"
+        assert df["value"][1] == "invalid"
+        assert df["value"][3] == "99"
 
-        # Verify invalid values are coerced to NaN
-        assert pd.isna(df["value"][1])
+        # None becomes NA in string column
         assert pd.isna(df["value"][2])
 
     def test_percentage_column_conversion(self) -> None:
@@ -215,13 +221,13 @@ class TestSDLTableResultDataToDf:
             SDLColumn(name="completion", type=PQColumnType.PERCENTAGE),
         ]
 
-        values = [
+        values: list[list[JsonValue]] = [
             [0.75],
             [0.9],
             [1.0],
         ]
 
-        result_data = SDLTableResultData(match_count=3, values=values, columns=columns)  # type: ignore[arg-type]
+        result_data = SDLTableResultData(match_count=3, values=values, columns=columns)
         df = result_data.to_df()
 
         assert pd.api.types.is_numeric_dtype(df["completion"])
@@ -250,12 +256,12 @@ class TestSDLTableResultDataToDf:
         columns = [SDLColumn(name="timestamp", type=PQColumnType.TIMESTAMP)]
 
         # 10-digit timestamp (seconds): 2021-01-01 00:00:00 UTC
-        values = [[1609459200]]
+        values: list[list[JsonValue]] = [[1609459200]]
 
-        result_data = SDLTableResultData(match_count=1, values=values, columns=columns)  # type: ignore[arg-type]
+        result_data = SDLTableResultData(match_count=1, values=values, columns=columns)
 
         # Test with UTC timezone (method only accepts datetime.timezone)
-        df = result_data.to_df(tz=timezone.utc)
+        df = result_data.to_df(tz=UTC)
 
         assert pd.api.types.is_string_dtype(df["timestamp"])
         timestamp_str = df["timestamp"][0]
@@ -274,12 +280,12 @@ class TestSDLTableResultDataToDf:
             SDLColumn(name="percentage", type=PQColumnType.PERCENTAGE),
         ]
 
-        values = [
+        values: list[list[JsonValue]] = [
             [1609459200, 100, "test1", True, 0.95],  # timestamp in seconds
             [1640995200, 200, "test2", False, 0.87],
         ]
 
-        result_data = SDLTableResultData(match_count=2, values=values, columns=columns)  # type: ignore[arg-type]
+        result_data = SDLTableResultData(match_count=2, values=values, columns=columns)
         df = result_data.to_df()
 
         # Verify all types
@@ -291,3 +297,28 @@ class TestSDLTableResultDataToDf:
 
         # Verify shape
         assert df.shape == (2, 5)
+
+    def test_assert_never_receives_column_type_not_dtype(self) -> None:
+        """Regression test: assert_never should receive column.type, not dtype, for debugging the invalid enum value."""
+        # ignore[arg-type] below is to inject an invalid column type
+        # This simulates what would happen if a new PQColumnType
+        # was added but not handled in the to_df() method
+        invalid_column = SDLColumn.model_construct(
+            name="test_column",
+            type="FUTURE_TYPE",  # type: ignore[arg-type]
+        )
+
+        columns = [invalid_column]
+        values: list[list[JsonValue]] = [["test_value"]]
+        result_data = SDLTableResultData(match_count=1, values=values, columns=columns)
+
+        # When to_df() processes the invalid column type, it reaches the else clause
+        # and calls assert_never(column.type)
+        with pytest.raises(AssertionError) as exc_info:
+            result_data.to_df()
+
+        error_message = str(exc_info.value)
+
+        assert "FUTURE_TYPE" in error_message, (
+            f"Expected 'FUTURE_TYPE' in error message, got: {error_message}"
+        )

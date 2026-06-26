@@ -1,11 +1,16 @@
 """Pydantic models for Unified Asset Inventory."""
 
-from enum import Enum
+from collections.abc import Iterable
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
+_common_model_config = ConfigDict(
+    validate_by_name=False, validate_by_alias=True, serialize_by_alias=True
+)
 
-class Surface(str, Enum):
+
+class Surface(StrEnum):
     """Asset surface types in Unified Asset Inventory."""
 
     ENDPOINT = "ENDPOINT"
@@ -17,7 +22,7 @@ class Surface(str, Enum):
 class InventoryNote(BaseModel):
     """A note associated with an inventory item."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = _common_model_config
 
     id: str | None = None
     note: str | None = None
@@ -31,7 +36,7 @@ class InventoryNote(BaseModel):
 class DeviceReviewLog(BaseModel):
     """Device review log entry."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = _common_model_config
 
     current: str | None = None
     previous: str | None = None
@@ -45,7 +50,7 @@ class DeviceReviewLog(BaseModel):
 class NetworkInterface(BaseModel):
     """Network interface information."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = _common_model_config
 
     gateway_ip: str | None = Field(None, alias="gatewayIp")
     gateway_mac: str | None = Field(None, alias="gatewayMac")
@@ -63,7 +68,7 @@ class InventoryItem(BaseModel):
     All fields are optional as different resource types have different available fields.
     """
 
-    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    model_config = ConfigDict(extra="allow") | _common_model_config
 
     # Core/Common fields (CommonResponseMixin)
     id: str | None = None
@@ -352,11 +357,49 @@ class InventoryItem(BaseModel):
     last_password_change_time: str | None = Field(None, alias="lastPasswordChangeTime")
     entraid_group_type: str | None = Field(None, alias="entraidGroupType")
 
+    def model_dump_json_with_field_subset(self, include_field_names: set[str]) -> str:
+        """Output a JSON representation that only includes a subset of the InventoryItem field names.
+
+        We also set `exclude_unset=True`, so the JSON output accurately reflects what we received from the
+        upstream API and isn't packed with default=None values for all fields in the BaseModel.
+
+        (Just a convenience routine to centralize the model_dump_json config.)
+        """
+        # Require exclude_unset=True otherwise we always output the entire structure of InventoryItem.
+        return self.model_dump_json(indent=2, include=include_field_names, exclude_unset=True)
+
+    @classmethod
+    def _map_aliases_to_field_names(cls, aliases: Iterable[str]) -> set[str]:
+        """Map field aliases (camelCase) to actual model field names (snake_case).
+
+        Args:
+            aliases: Iterable of field aliases (e.g., ["resourceType", "assetStatus"])
+
+        Returns:
+            Set of actual model field names (e.g., {"resource_type", "asset_status"})
+        """
+        # Build mapping from alias to field name
+        alias_to_field = {}
+        for field_name, field_info in cls.model_fields.items():
+            alias = field_info.alias if field_info.alias else field_name
+            alias_to_field[alias] = field_name
+
+        # Map the provided aliases to field names
+        field_names = set()
+        for alias in aliases:
+            if alias in alias_to_field:
+                field_names.add(alias_to_field[alias])
+            else:
+                # If no mapping found, try using it as-is (in case it's already a field name)
+                field_names.add(alias)
+
+        return field_names
+
 
 class PaginationInfo(BaseModel):
     """Pagination information for inventory response."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = _common_model_config
 
     total_count: int | None = Field(None, alias="totalCount")
     limit: int | None = None
@@ -366,7 +409,23 @@ class PaginationInfo(BaseModel):
 class InventoryResponse(BaseModel):
     """Response from inventory API containing items and pagination info."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = _common_model_config
 
     data: list[InventoryItem] = Field(default_factory=list)
     pagination: PaginationInfo | None = None
+
+    def model_dump_json_with_field_subset(self, include_field_names: set[str]) -> str:
+        """Output a JSON representation that only includes a subset of the InventoryItem field names.
+
+        We also set `exclude_unset=True`, so the JSON output accurately reflects what we received from the
+        upstream API and isn't packed with default=None values for all fields in the BaseModel.
+
+        (Just a convenience routine to centralize the model_dump_json config.)
+        """
+        # Require exclude_unset=True otherwise we always output the entire structure of InventoryItem.
+        # propagates include_field_names to the items in self.data.
+        return self.model_dump_json(
+            indent=2,
+            include={"data": {"__all__": include_field_names}, "pagination": True},
+            exclude_unset=True,
+        )

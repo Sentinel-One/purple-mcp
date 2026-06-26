@@ -6,14 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from purple_mcp.libs.vulnerabilities import (
-    PageInfo,
-    VulnerabilityConnection,
-    VulnerabilityDetail,
-    VulnerabilityHistoryItemConnection,
-    VulnerabilityNote,
-    VulnerabilityNoteConnection,
-)
+from purple_mcp.libs.vulnerabilities import PageInfo, VulnerabilityDetail, VulnerabilityNote
 from purple_mcp.type_defs import JsonDict
 
 T = TypeVar("T")

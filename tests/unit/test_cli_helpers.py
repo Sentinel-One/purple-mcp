@@ -8,13 +8,15 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 from collections.abc import Generator
-from unittest.mock import Mock, call, patch
+from unittest.mock import Mock, call
 
+import click
 import pytest
 
 import purple_mcp.cli as cli
-from purple_mcp.config import ENV_PREFIX
+from purple_mcp.config import ENV_PREFIX, Settings
 
 
 @pytest.fixture(autouse=True)
@@ -31,21 +33,23 @@ def _clear_env() -> Generator[None, None, None]:
 class TestSetupLogging:
     """Ensure ``_setup_logging`` configures the root logger as expected."""
 
-    def test_verbose_sets_debug(self) -> None:
+    def test_verbose_sets_debug(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test that verbose flag sets logging level to DEBUG."""
-        with patch("logging.basicConfig") as basic_config:
-            cli._setup_logging(verbose=True)
-            basic_config.assert_called_once()
-            _args, kwargs = basic_config.call_args
-            assert kwargs["level"] == logging.DEBUG
+        basic_config = Mock()
+        monkeypatch.setattr(logging, logging.basicConfig.__name__, basic_config)
+        cli._setup_logging(verbose=True)
+        basic_config.assert_called_once()
+        _args, kwargs = basic_config.call_args
+        assert kwargs["level"] == logging.DEBUG
 
-    def test_non_verbose_sets_info(self) -> None:
+    def test_non_verbose_sets_info(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test that non-verbose flag sets logging level to INFO."""
-        with patch("logging.basicConfig") as basic_config:
-            cli._setup_logging(verbose=False)
-            basic_config.assert_called_once()
-            _args, kwargs = basic_config.call_args
-            assert kwargs["level"] == logging.INFO
+        basic_config = Mock()
+        monkeypatch.setattr(logging, logging.basicConfig.__name__, basic_config)
+        cli._setup_logging(verbose=False)
+        basic_config.assert_called_once()
+        _args, kwargs = basic_config.call_args
+        assert kwargs["level"] == logging.INFO
 
 
 class TestApplyEnvironmentOverrides:
@@ -63,8 +67,10 @@ class TestApplyEnvironmentOverrides:
             stateless_http=True,
         )
 
+        # Note: sdl_api_token now maps to CONSOLE_TOKEN (not SDL_READ_LOGS_TOKEN)
+        # When both sdl_api_token and graphql_service_token are provided,
+        # graphql_service_token (processed second) takes precedence
         assert os.environ[f"{ENV_PREFIX}TRANSPORT_MODE"] == "http"
-        assert os.environ[f"{ENV_PREFIX}SDL_READ_LOGS_TOKEN"] == "sdl"
         assert os.environ[f"{ENV_PREFIX}CONSOLE_TOKEN"] == "graphql"
         assert os.environ[f"{ENV_PREFIX}CONSOLE_BASE_URL"] == "https://example.test"
         assert os.environ[f"{ENV_PREFIX}CONSOLE_GRAPHQL_ENDPOINT"] == "/custom"
@@ -74,7 +80,10 @@ class TestApplyEnvironmentOverrides:
     def test_defaults_are_not_overridden(self) -> None:
         """Default endpoint should *not* be written to the environment."""
         # Ensure the environment variable is not set before testing
+        os.environ.pop(f"{ENV_PREFIX}TRANSPORT_MODE", None)
         os.environ.pop(f"{ENV_PREFIX}CONSOLE_GRAPHQL_ENDPOINT", None)
+        os.environ.pop(f"{ENV_PREFIX}ALERTS_GRAPHQL_ENDPOINT", None)
+        os.environ.pop(f"{ENV_PREFIX}STATELESS_HTTP", None)
 
         cli._apply_environment_overrides(
             transport_mode=None,
@@ -86,6 +95,7 @@ class TestApplyEnvironmentOverrides:
             stateless_http=None,
         )
 
+        assert f"{ENV_PREFIX}TRANSPORT_MODE" not in os.environ
         assert f"{ENV_PREFIX}CONSOLE_GRAPHQL_ENDPOINT" not in os.environ
         assert f"{ENV_PREFIX}ALERTS_GRAPHQL_ENDPOINT" not in os.environ
         assert f"{ENV_PREFIX}STATELESS_HTTP" not in os.environ
@@ -94,53 +104,55 @@ class TestApplyEnvironmentOverrides:
 class TestCreateSettings:
     """Test _create_settings helper function in isolation."""
 
-    def test_create_settings_error_handling(self) -> None:
+    def test_create_settings_error_handling(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test that _create_settings properly handles Settings() exceptions."""
-        with (
-            patch("purple_mcp.cli.Settings") as mock_settings,
-            patch("purple_mcp.cli.sys.exit") as mock_exit,
-            patch("purple_mcp.cli.click.echo") as mock_echo,
-        ):
-            # Mock Settings to raise an exception
-            mock_settings.side_effect = RuntimeError("Test configuration error")
+        # Mock Settings to raise an exception
+        mock_settings = Mock(side_effect=RuntimeError("Test configuration error"))
+        mock_exit = Mock()
+        mock_echo = Mock()
 
-            # Call the function
-            cli._create_settings()
+        monkeypatch.setattr(cli, Settings.__name__, mock_settings)
+        monkeypatch.setattr(cli.sys, sys.exit.__name__, mock_exit)  # type: ignore[attr-defined]
+        monkeypatch.setattr(cli.click, click.echo.__name__, mock_echo)  # type: ignore[attr-defined]
 
-            # Assert Settings was called
-            mock_settings.assert_called_once()
+        # Call the function
+        cli._create_settings()
 
-            # Assert sys.exit was called with status 1
-            mock_exit.assert_called_once_with(1)
+        # Assert Settings was called
+        mock_settings.assert_called_once()
 
-            # Assert error messages were printed in correct order
-            expected_calls = [
-                call("✗ Configuration error: Test configuration error", err=True),
-                call("\nRequired environment variables or CLI options:", err=True),
-                call(
-                    f"  --graphql-service-token or {ENV_PREFIX}CONSOLE_TOKEN (used for both Console and SDL)",
-                    err=True,
-                ),
-                call(f"  --console-base-url or {ENV_PREFIX}CONSOLE_BASE_URL", err=True),
-                call(
-                    "\nNote: Token must have Account or Site level permissions (not Global)",
-                    err=True,
-                ),
-            ]
-            mock_echo.assert_has_calls(expected_calls)
+        # Assert sys.exit was called with status 1
+        mock_exit.assert_called_once_with(1)
 
-    def test_create_settings_success(self) -> None:
+        # Assert error messages were printed in correct order
+        expected_calls = [
+            call("✗ Configuration error: Test configuration error", err=True),
+            call("\nRequired environment variables or CLI options:", err=True),
+            call(
+                f"  --graphql-service-token or {ENV_PREFIX}CONSOLE_TOKEN (used for both Console and SDL)",
+                err=True,
+            ),
+            call(f"  --console-base-url or {ENV_PREFIX}CONSOLE_BASE_URL", err=True),
+            call(
+                "\nNote: Token must have Account or Site level permissions (not Global)",
+                err=True,
+            ),
+        ]
+        mock_echo.assert_has_calls(expected_calls)
+
+    def test_create_settings_success(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test that _create_settings returns Settings instance when successful."""
-        with patch("purple_mcp.cli.Settings") as mock_settings:
-            # Mock Settings to return a valid instance
-            mock_instance = Mock()
-            mock_settings.return_value = mock_instance
+        # Mock Settings to return a valid instance
+        mock_instance = Mock()
+        mock_settings = Mock(return_value=mock_instance)
 
-            # Call the function
-            result = cli._create_settings()
+        monkeypatch.setattr(cli, Settings.__name__, mock_settings)
 
-            # Assert Settings was called
-            mock_settings.assert_called_once()
+        # Call the function
+        result = cli._create_settings()
 
-            # Assert the Settings instance is returned
-            assert result is mock_instance
+        # Assert Settings was called
+        mock_settings.assert_called_once()
+
+        # Assert the Settings instance is returned
+        assert result is mock_instance

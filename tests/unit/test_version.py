@@ -1,12 +1,7 @@
 """Test for purple_mcp.__version__."""
 
-import sys
+import tomllib
 from pathlib import Path
-
-if sys.version_info < (3, 11):  # pragma: no cover
-    import tomli as tomllib
-else:  # pragma: no cover
-    import tomllib
 
 import purple_mcp
 

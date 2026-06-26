@@ -1,12 +1,17 @@
 # Misconfigurations Library
 
-A standalone Python library for interacting with the SentinelOne Security Posture Management (XSPM) Misconfigurations GraphQL API.
+A standalone Python library for interacting with the SentinelOne Security Posture Management (XSPM)
+Misconfigurations GraphQL API.
 
 ## Overview
 
-This library provides a typed, async interface to the XSPM Misconfigurations API, handling schema compatibility and providing robust error handling. It's designed to be completely independent and can be used outside of the MCP context.
+This library provides a typed, async interface to the XSPM Misconfigurations API, handling schema
+compatibility and providing robust error handling. It's designed to be completely independent and
+can be used outside of the MCP context.
 
-> **📖 Read-Only Library**: This library provides read-only access to the misconfigurations management system. It supports retrieving misconfigurations, notes, and history, but does not include any data modification operations.
+> **📖 Read-Only Library**: This library provides read-only access to the misconfigurations
+> management system. It supports retrieving misconfigurations, notes, and history, but does not
+> include any data modification operations.
 
 ## Installation
 
@@ -22,7 +27,7 @@ from purple_mcp.libs.misconfigurations import MisconfigurationsClient, Misconfig
 
 async def main():
     config = MisconfigurationsConfig(
-        graphql_url="https://console.example.com/web/api/v2.1/xspm/findings/misconfigurations/graphql",
+        graphql_url="https://console.sentinelone.net/web/api/v2.1/xspm/findings/misconfigurations/graphql",
         auth_token="your-bearer-token"
     )
 
@@ -62,7 +67,7 @@ asyncio.run(main())
 
 ```python
 config = MisconfigurationsConfig(
-    graphql_url="https://console.example.com/web/api/v2.1/xspm/findings/misconfigurations/graphql",
+    graphql_url="https://console.sentinelone.net/web/api/v2.1/xspm/findings/misconfigurations/graphql",
     auth_token="your-bearer-token",
     timeout=30.0  # Optional
 )
@@ -71,6 +76,7 @@ config = MisconfigurationsConfig(
 ## Filter System
 
 The library includes built-in DoS protection for filters:
+
 - Maximum 50 filters per request
 - Maximum 100 values per filter
 
@@ -86,11 +92,15 @@ misconfigurations = await client.search_misconfigurations(filters=filters, first
 ## Available Methods
 
 - `get_misconfiguration(misconfiguration_id: str)` - Retrieve a specific misconfiguration by ID
-- `list_misconfigurations(first: int = 10, after: str | None = None, view_type: str = "ALL")` - List recent misconfigurations
-- `search_misconfigurations(filters: list[FilterInput] | None = None, first: int = 10, after: str | None = None, view_type: str = "ALL")` - Search with filters
+- `list_misconfigurations(first: int = 10, after: str | None = None, view_type: str = "ALL")` -
+  List recent misconfigurations
+- `search_misconfigurations(filters: list[FilterInput] | None = None, first: int = 10, after: str | None = None, view_type: str = "ALL")` -
+  Search with filters
 - `get_misconfiguration_notes(misconfiguration_id: str)` - Get notes for a misconfiguration
-- `get_misconfiguration_history(misconfiguration_id: str, first: int = 10, after: str | None = None)` - View misconfiguration activity history
+- `get_misconfiguration_history(misconfiguration_id: str, first: int = 10, after: str | None = None)` -
+  View misconfiguration activity history
 
 ## Contributing
 
-This library follows the purple-mcp project's contribution guidelines. See the main project's CONTRIBUTING.md for details.
+This library follows the purple-mcp project's contribution guidelines. See the main project's
+CONTRIBUTING.md for details.

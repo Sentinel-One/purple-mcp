@@ -26,8 +26,6 @@ lint.select = [
 ]
 
 lint.ignore = [
-    "F403",   # star-imports: Allows `from module import *`
-    "E402",   # module-import-not-at-top-of-file: Allows imports not at file top
     "E501",   # line-too-long: Disables line length limit (handled by formatter)
     "W191",   # tab-indentation: Allows tab indentation
     "E111",   # indentation-with-invalid-multiple: Allows non-4-space indentation
@@ -116,7 +114,7 @@ exclude = [
     ".terraform",
     "backups",
 ]
-target-version = "py310"
+target-version = "py311"
 line-length = 99
 lint.unfixable = []
 
@@ -126,8 +124,6 @@ indent-style = "space"
 line-ending = "lf"
 docstring-code-format = true
 
-[lint.per-file-ignores]
-"__init__.py" = ["F401"]  # unused-import: Allow unused imports in __init__.py files
 
 [lint.isort]
 combine-as-imports = true

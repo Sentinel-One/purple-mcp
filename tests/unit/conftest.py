@@ -8,9 +8,8 @@ import logging
 import os
 import uuid
 from collections.abc import Callable, Generator
-from contextlib import AbstractContextManager
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -114,23 +113,6 @@ def minimal_env_config(clean_env: dict[str, str | None]) -> dict[str, str]:
     return config
 
 
-@pytest.fixture
-def mock_env_var() -> Callable[[str, str], AbstractContextManager[None]]:
-    """Factory fixture for temporarily setting environment variables.
-
-    Usage:
-        def test_something(mock_env_var):
-            with mock_env_var("MY_VAR", "my_value"):
-                # Test code here
-                pass
-    """
-
-    def _mock_env_var(key: str, value: str) -> AbstractContextManager[None]:
-        return patch.dict(os.environ, {key: value})
-
-    return _mock_env_var
-
-
 # Pytest configuration
 def pytest_configure(config: pytest.Config) -> None:
     """Configure pytest with custom markers and settings."""
@@ -169,9 +151,9 @@ def reset_lru_cache() -> Generator[None, None, None]:
 
     # Import and clear the get_settings cache
     try:
-        from purple_mcp.config import get_settings
+        from purple_mcp.config import _load_base_settings
 
-        get_settings.cache_clear()
+        _load_base_settings.cache_clear()
     except ImportError:
         # Module not available in this test context
         pass
@@ -208,7 +190,7 @@ def mock_settings() -> Callable[..., MagicMock]:
         mock = MagicMock()
 
         # Default values for all Settings fields
-        defaults: dict[str, str] = {
+        defaults: dict[str, str | bool | list[str] | None] = {
             # Tokens
             "sdl_api_token": "test-sdl-token",
             "graphql_service_token": "test-graphql-token",
@@ -219,15 +201,23 @@ def mock_settings() -> Callable[..., MagicMock]:
             "sentinelone_misconfigurations_graphql_endpoint": "/web/api/v2.1/xspm/findings/misconfigurations/graphql",
             "sentinelone_vulnerabilities_graphql_endpoint": "/web/api/v2.1/xspm/findings/vulnerabilities/graphql",
             "sentinelone_inventory_restapi_endpoint": "/web/api/v2.1/xdr/assets",
+            "sdl_base_url": "https://console.test",
             # Purple AI user details
-            "purple_ai_account_id": "test-account",
-            "purple_ai_team_token": "test-team-token",
             "purple_ai_email_address": "test@example.test",
             "purple_ai_session_id": uuid.uuid4().hex,
             "purple_ai_user_agent": "test-agent",
             "purple_ai_build_date": "2025-01-01",
             "purple_ai_build_hash": "testhash",
             "purple_ai_console_version": "1.0.0",
+            # Purple AI console scope IDs
+            "purple_ai_console_id": "1111111111111111111",
+            "purple_ai_console_tenant_id": "2222222222222222222",
+            "purple_ai_console_account_id": "3333333333333333333",
+            "purple_ai_console_site_id": "4444444444444444444",
+            # SDL
+            "sdl_query_origin": None,
+            "sdl_console_account_ids": ["account-1"],
+            "sdl_console_site_ids": ["site-1"],
             # Environment
             "environment": "development",
             # Computed properties
@@ -236,6 +226,10 @@ def mock_settings() -> Callable[..., MagicMock]:
             "misconfigurations_graphql_url": "https://console.test/web/api/v2.1/xspm/findings/misconfigurations/graphql",
             "vulnerabilities_graphql_url": "https://console.test/web/api/v2.1/xspm/findings/vulnerabilities/graphql",
             "inventory_api_url": "https://console.test/web/api/v2.1/xdr/assets",
+            "sdl_full_url": "https://console.test",
+            # Transport configuration
+            "stateless_http": False,
+            "transport_mode": "stdio",
         }
 
         # Apply overrides

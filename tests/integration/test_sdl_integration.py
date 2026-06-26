@@ -12,7 +12,7 @@ import logging
 import os
 import warnings
 from collections.abc import AsyncGenerator, Callable, Generator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastmcp import Client
@@ -20,17 +20,12 @@ from pydantic import ValidationError
 from pytest import LogCaptureFixture
 
 from purple_mcp.config import ENV_PREFIX, get_settings
-from purple_mcp.libs.sdl import (
-    SDLHandlerError,
-    SDLPowerQueryHandler,
-    SDLPQAttributes,
-    SDLPQFrequency,
-    SDLPQResultType,
-    SDLQueryClient,
-    SDLQueryPriority,
-    create_sdl_settings,
-)
-from purple_mcp.libs.sdl.config import SDLSettings
+from purple_mcp.libs.sdl.config import SDLSettings, create_sdl_settings
+from purple_mcp.libs.sdl.enums import SDLPQFrequency, SDLPQResultType, SDLQueryPriority
+from purple_mcp.libs.sdl.models import SDLPQAttributes
+from purple_mcp.libs.sdl.sdl_exceptions import SDLHandlerError
+from purple_mcp.libs.sdl.sdl_powerquery_handler import SDLPowerQueryHandler
+from purple_mcp.libs.sdl.sdl_query_client import SDLQueryClient
 from purple_mcp.server import app
 from purple_mcp.tools.sdl import _iso_to_nanoseconds, powerquery
 
@@ -44,6 +39,12 @@ class TestSDLDirectClient:
     def real_sdl_settings(self, integration_env_check: dict[str, str]) -> SDLSettings:
         """Create real SDL settings from environment variables."""
         settings = get_settings()
+
+        # Ensure credentials are configured (integration tests require them)
+        if settings.sdl_api_token is None:
+            raise RuntimeError("SDL API token not configured for integration tests")
+        if settings.sentinelone_console_base_url is None:
+            raise RuntimeError("Console base URL not configured for integration tests")
 
         return create_sdl_settings(
             auth_token=settings.sdl_api_token,
@@ -445,7 +446,7 @@ class TestSDLErrorScenarios:
         """Test PowerQuery with invalid time range."""
         # Invalid time range (end before start)
         # Invalid time range (start after end)
-        end_time = datetime.now(timezone.utc)
+        end_time = datetime.now(UTC)
         start_time = end_time + timedelta(hours=1)  # Start after end
         start_datetime = start_time.isoformat().replace("+00:00", "Z")
         end_datetime = end_time.isoformat().replace("+00:00", "Z")
@@ -481,6 +482,12 @@ class TestSDLConfiguration:
     def test_sdl_settings_from_environment(self, integration_env_check: dict[str, str]) -> None:
         """Test SDL settings load from real environment."""
         settings = get_settings()
+
+        # Ensure credentials are configured (integration tests require them)
+        if settings.sdl_api_token is None:
+            raise RuntimeError("SDL API token not configured for integration tests")
+        if settings.sentinelone_console_base_url is None:
+            raise RuntimeError("Console base URL not configured for integration tests")
 
         # Verify real SDL settings
         assert settings.sdl_api_token != ""
@@ -671,15 +678,15 @@ def integration_development_environment(clean_integration_environment: None) -> 
 
 
 @pytest.fixture
-def integration_production_environment(clean_integration_environment: None) -> None:
-    """Fixture to set production environment for integration tests."""
-    os.environ[f"{ENV_PREFIX}ENV"] = "production"
+def integration_release_environment(clean_integration_environment: None) -> None:
+    """Fixture to set release environment for integration tests."""
+    os.environ[f"{ENV_PREFIX}ENV"] = "release"
 
 
 @pytest.fixture
-def integration_staging_environment(clean_integration_environment: None) -> None:
-    """Fixture to set staging environment for integration tests."""
-    os.environ[f"{ENV_PREFIX}ENV"] = "staging"
+def integration_testing_environment(clean_integration_environment: None) -> None:
+    """Fixture to set testing environment for integration tests."""
+    os.environ[f"{ENV_PREFIX}ENV"] = "testing"
 
 
 @pytest.fixture
@@ -720,6 +727,12 @@ class TestSDLTLSSecurityIntegration:
         """Test TLS security configuration with real environment settings."""
         settings = get_settings()
 
+        # Ensure credentials are configured (integration tests require them)
+        if settings.sdl_api_token is None:
+            raise RuntimeError("SDL API token not configured for integration tests")
+        if settings.sentinelone_console_base_url is None:
+            raise RuntimeError("Console base URL not configured for integration tests")
+
         # Test secure configuration (default)
         sdl_settings = create_sdl_settings(
             auth_token=settings.sdl_api_token,
@@ -750,6 +763,12 @@ class TestSDLTLSSecurityIntegration:
     ) -> None:
         """Test secure SDL connection with real API endpoints."""
         settings = get_settings()
+
+        # Ensure credentials are configured (integration tests require them)
+        if settings.sdl_api_token is None:
+            raise RuntimeError("SDL API token not configured for integration tests")
+        if settings.sentinelone_console_base_url is None:
+            raise RuntimeError("Console base URL not configured for integration tests")
 
         # Create secure SDL settings
         sdl_settings = create_sdl_settings(
@@ -816,6 +835,12 @@ class TestSDLTLSSecurityIntegration:
         """Test TLS bypass warnings in development environment."""
         settings = get_settings()
 
+        # Ensure credentials are configured (integration tests require them)
+        if settings.sdl_api_token is None:
+            raise RuntimeError("SDL API token not configured for integration tests")
+        if settings.sentinelone_console_base_url is None:
+            raise RuntimeError("Console base URL not configured for integration tests")
+
         # Create settings with TLS bypass
         sdl_settings = create_sdl_settings(
             auth_token=settings.sdl_api_token,
@@ -855,13 +880,19 @@ class TestSDLTLSSecurityIntegration:
         )
 
     @pytest.mark.integration
-    def test_production_environment_protection(
+    def test_release_environment_protection(
         self,
         integration_env_check: dict[str, str],
-        integration_production_environment: None,
+        integration_release_environment: None,
     ) -> None:
-        """Test that production environment is protected from TLS bypass."""
+        """Test that release environments are protected from TLS bypass."""
         settings = get_settings()
+
+        # Ensure credentials are configured (integration tests require them)
+        if settings.sdl_api_token is None:
+            raise RuntimeError("SDL API token not configured for integration tests")
+        if settings.sentinelone_console_base_url is None:
+            raise RuntimeError("Console base URL not configured for integration tests")
 
         # Should fail at configuration level
         with pytest.raises(ValidationError) as exc_info:
@@ -869,17 +900,19 @@ class TestSDLTLSSecurityIntegration:
                 auth_token=settings.sdl_api_token,
                 base_url=settings.sentinelone_console_base_url + "/sdl",
                 skip_tls_verify=True,
-                environment="production",
+                environment="release",
             )
 
-        assert "TLS verification bypass is FORBIDDEN in production" in str(exc_info.value)
+        assert "TLS verification bypass is FORBIDDEN in release environments" in str(
+            exc_info.value
+        )
 
         # Should also fail at client level if bypassed
         secure_settings = create_sdl_settings(
             auth_token=settings.sdl_api_token,
             base_url=settings.sentinelone_console_base_url + "/sdl",
             skip_tls_verify=False,
-            environment="production",
+            environment="release",
         )
 
         # Manually enable TLS bypass to test client-level protection
@@ -892,30 +925,36 @@ class TestSDLTLSSecurityIntegration:
             )
 
         assert "SECURITY ERROR" in str(exc_info.value), "Should raise security error"
-        assert "FORBIDDEN in production" in str(exc_info.value), (
-            "Error should mention production restriction"
+        assert "FORBIDDEN in release environments" in str(exc_info.value), (
+            "Error should mention release environments restriction"
         )
 
-        # Verify production environment protection is working at both levels
-        logger.debug("Production environment protection verified at config and client levels")
+        # Verify release environment protection is working at both levels
+        logger.debug("Release environment protection verified at config and client levels")
 
     @pytest.mark.integration
-    def test_staging_environment_additional_warnings(
+    def test_testing_environment_additional_warnings(
         self,
         caplog: LogCaptureFixture,
         integration_env_check: dict[str, str],
-        integration_staging_environment: None,
+        integration_testing_environment: None,
         integration_isolated_warnings: list[warnings.WarningMessage],
     ) -> None:
-        """Test additional warnings in staging environment."""
+        """Test additional warnings in testing environment."""
         settings = get_settings()
+
+        # Ensure credentials are configured (integration tests require them)
+        if settings.sdl_api_token is None:
+            raise RuntimeError("SDL API token not configured for integration tests")
+        if settings.sentinelone_console_base_url is None:
+            raise RuntimeError("Console base URL not configured for integration tests")
 
         # Create settings with TLS bypass
         sdl_settings = create_sdl_settings(
             auth_token=settings.sdl_api_token,
             base_url=settings.sentinelone_console_base_url + "/sdl",
             skip_tls_verify=True,
-            environment="staging",
+            environment="testing",
         )
 
         # Should allow but warn
@@ -928,9 +967,9 @@ class TestSDLTLSSecurityIntegration:
         error_records = [record for record in caplog.records if record.levelname == "ERROR"]
         assert len(error_records) > 0
         assert any(
-            hasattr(record, "environment") and record.environment == "staging"
+            hasattr(record, "environment") and record.environment == "testing"
             for record in error_records
-        ), "Environment should be in log record extras for staging"
+        ), "Environment should be in log record extras for testing"
 
         # Should still issue security warnings
         security_warnings = [
@@ -938,13 +977,13 @@ class TestSDLTLSSecurityIntegration:
             for warning in integration_isolated_warnings
             if "SECURITY WARNING" in str(warning.message)
         ]
-        assert len(security_warnings) >= 1, "Should issue security warnings in staging environment"
+        assert len(security_warnings) >= 1, "Should issue security warnings in testing environment"
 
-        # Verify staging environment warnings are working
+        # Verify testing environment warnings are working
         assert len(error_records) > 0, "Should have error records"
         assert len(security_warnings) >= 1, "Should have security warnings"
         logger.debug(
-            "Staging environment warnings verified: errors=%d, security_warnings=%d",
+            "Testing environment warnings verified: errors=%d, security_warnings=%d",
             len(error_records),
             len(security_warnings),
         )

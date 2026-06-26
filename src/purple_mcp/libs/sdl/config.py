@@ -6,12 +6,12 @@ integration with explicit code-based configuration, validation, and default valu
 
 import logging
 import os
-from typing import Final, TypedDict
+from typing import Final, Self, TypedDict
 
 import pydantic
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing_extensions import Self, Unpack
+from typing_extensions import Unpack
 
 from purple_mcp.libs.sdl.security import validate_tls_bypass_config
 
@@ -56,7 +56,7 @@ class SDLSettings(BaseSettings):
 
     # Core SDL Configuration
     base_url: str = Field(
-        description=f"Base URL for SDL API. {SDL_API_PATH} will be appended if not present.",
+        description="Base URL for SDL API.",
     )
 
     auth_token: str = Field(
@@ -87,7 +87,7 @@ class SDLSettings(BaseSettings):
 
     skip_tls_verify: bool = Field(
         default=False,
-        description="Skip TLS certificate verification (SECURITY RISK - never use in production)",
+        description="Skip TLS certificate verification (SECURITY RISK - never use in release environments)",
     )
 
     # Query Configuration
@@ -122,9 +122,9 @@ class SDLSettings(BaseSettings):
 
     # Environment Configuration
     environment: str = Field(
-        default_factory=lambda: os.getenv("PURPLEMCP_ENV", "production"),
-        description="Environment name for security validation (e.g., 'development', 'production'). "
-        "Defaults to PURPLEMCP_ENV environment variable, or 'production' if not set.",
+        default_factory=lambda: os.getenv("PURPLEMCP_ENV", "release"),
+        description="Environment name for security validation (e.g., 'development', 'testing', 'release'). "
+        "Defaults to PURPLEMCP_ENV environment variable, or 'release' if not set.",
     )
 
     @field_validator("base_url")
@@ -146,10 +146,6 @@ class SDLSettings(BaseSettings):
 
         # Remove trailing slashes for consistency
         v = v.rstrip("/")
-
-        # Ensure SDL API path is included
-        if not v.endswith(SDL_API_PATH):
-            v += SDL_API_PATH
 
         return v
 

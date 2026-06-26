@@ -1,0 +1,18 @@
+# See: https://editorconfig.org/
+root = true
+
+[*]
+
+# Standard defaults
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.{md,MD}]
+max_line_length = off
+ij_formatter_enabled = false
+
+# Python (delegate to ruff format for the most part)
+[*.{py,pyi}]
+max_line_length = 99

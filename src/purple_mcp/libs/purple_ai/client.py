@@ -13,8 +13,8 @@ import secrets
 import string
 import time
 import uuid
-from datetime import timedelta
-from enum import Enum
+from datetime import datetime, timedelta
+from enum import StrEnum
 from http import HTTPStatus
 from typing import cast
 
@@ -40,7 +40,7 @@ from purple_mcp.user_agent import get_user_agent
 logger = logging.getLogger(__name__)
 
 
-class PurpleAIResultType(str, Enum):
+class PurpleAIResultType(StrEnum):
     """The possible result types from Purple AI."""
 
     MESSAGE = "MESSAGE"
@@ -68,35 +68,43 @@ def _build_graphql_request(
     start_time: int,
     end_time: int,
     base_url: str,
-    version: str,
-    scalyr_account_id: str,
-    scalyr_team_token: str,
+    version: str | None,
     session_id: str | None,
     email_address: str | None,
     user_agent: str | None,
     build_date: str | None,
     build_hash: str | None,
+    user_time: datetime | None,
+    console_id: str | None,
+    tenant_id: str | None,
+    account_id: str | None,
+    site_id: str | None,
     conversation_id: str,
 ) -> str:
     """Construct a GraphQL request with properly escaped string values.
 
-    Builds a Purple AI GraphQL query by safely escaping all dynamic
-    configuration values using json.dumps(), preventing GraphQL injection
-    vulnerabilities that could occur with raw string substitution when values
-    contain quotes, backslashes, or other special characters.
+    Builds a Purple AI GraphQL query.
+
+    All dynamic string values are escaped via `json.dumps()`, which handles
+    quotes, backslashes, Unicode, and other special characters; `None`
+    values become the literal `null` in the emitted GraphQL.
 
     Args:
         start_time: Start time in milliseconds since epoch
         end_time: End time in milliseconds since epoch
         base_url: Console base URL
         version: Console version
-        scalyr_account_id: Scalyr User account ID
-        scalyr_team_token: Scalyr User team token
         session_id: User session ID
         email_address: User email address
         user_agent: User agent string
         build_date: Build date string
         build_hash: Build hash string
+        user_time: Timezone-aware local timestamp; serialized as an ISO-8601
+            string. Omitted from the request entirely when None.
+        console_id: Console (deployment) ID
+        tenant_id: Tenant scope ID
+        account_id: Account scope ID
+        site_id: Site scope ID
         conversation_id: Conversation identifier
 
     Returns:
@@ -106,33 +114,48 @@ def _build_graphql_request(
         The $input variable placeholder is intentionally left unescaped as it
         will be provided as a GraphQL variable in the query execution.
     """
-    # Use json.dumps to safely escape string values for GraphQL
-    # This handles quotes, backslashes, Unicode, and other special characters
+    user_time_field_iso_format = (
+        f"userTime: {json.dumps(user_time.isoformat())}" if user_time is not None else ""
+    )
+
+    # Build the nested tenant-details block once. The server requires the
+    # block at both request.tenantDetails and request.inputContent.tenantDetails
+    # to be identical; interpolating a shared fragment is the simplest way to
+    # guarantee equality.
+    tenant_details_block = f"""\
+                tenantDetails: {{
+                    userDetails: {{
+                        sessionId: {json.dumps(session_id)}
+                        emailAddress: {json.dumps(email_address)}
+                        userAgent: {json.dumps(user_agent)}
+                        buildDate: {json.dumps(build_date)}
+                        buildHash: {json.dumps(build_hash)}
+                        {user_time_field_iso_format}
+                    }}
+                    consoleDetails: {{
+                        consoleId: {json.dumps(console_id)}
+                        tenantId: {json.dumps(tenant_id)}
+                        accountId: {json.dumps(account_id)}
+                        siteId: {json.dumps(site_id)}
+                        baseUrl: {json.dumps(base_url)}
+                        version: {json.dumps(version)}
+                    }}
+                }}"""
+
     return f"""\
     query SimpleTestQuery($input: String!) {{
         purpleLaunchQuery(
             request: {{
                 isAsync: false
                 contentType: NATURAL_LANGUAGE
-                consoleDetails: {{
-                    baseUrl: {json.dumps(base_url)}
-                    version: {json.dumps(version)}
-                }}
+{tenant_details_block}
                 conversation: {{ id: {json.dumps(conversation_id)}, messages: [], entitlements: null }}
                 inputContent: {{
                     userInput: $input
                     displayedTimeRange: {{ start: {start_time}, end: {end_time} }}
                     viewSelector: EDR
                     contentType: NATURAL_LANGUAGE
-                    userDetails: {{
-                        accountId: {json.dumps(scalyr_account_id)}
-                        teamToken: {json.dumps(scalyr_team_token)}
-                        sessionId: {json.dumps(session_id)}
-                        emailAddress: {json.dumps(email_address)}
-                        userAgent: {json.dumps(user_agent)}
-                        buildDate: {json.dumps(build_date)}
-                        buildHash: {json.dumps(build_hash)}
-                    }}
+{tenant_details_block}
                 }}
             }}
         ) {{
@@ -218,13 +241,16 @@ class PurpleAIClient:
             end_time=current_time_millis,
             base_url=self.config.console_details.base_url,
             version=self.config.console_details.version,
-            scalyr_account_id=self.config.user_details.account_id,
-            scalyr_team_token=self.config.user_details.team_token,
             session_id=self.config.user_details.session_id,
             email_address=self.config.user_details.email_address,
             user_agent=self.config.user_details.user_agent,
             build_date=self.config.user_details.build_date,
             build_hash=self.config.user_details.build_hash,
+            user_time=self.config.user_details.user_time,
+            console_id=self.config.console_details.console_id,
+            tenant_id=self.config.console_details.tenant_id,
+            account_id=self.config.console_details.account_id,
+            site_id=self.config.console_details.site_id,
             conversation_id=conversation_id,
         )
 
@@ -525,8 +551,6 @@ if __name__ == "__main__":
         """Run a test query against Purple AI."""
         config = PurpleAIConfig(
             user_details=PurpleAIUserDetails(
-                account_id="0",
-                team_token="0",
                 session_id=uuid.uuid4().hex,
                 email_address=None,
                 user_agent=f"sentinelone/purple-mcp (version {__version__})",
@@ -534,7 +558,7 @@ if __name__ == "__main__":
                 build_hash=None,
             ),
             console_details=PurpleAIConsoleDetails(
-                base_url="https://console.example.com",
+                base_url="https://console.sentinelone.net",
                 version="S",
             ),
         )

@@ -33,13 +33,13 @@ def _isolate_cli_environment() -> Generator[None, None, None]:
     (or other env vars) and subsequent tests (like TestPurpleAIRealClient) pick
     up those values from the cached Settings instance.
     """
-    from purple_mcp.config import get_settings
+    from purple_mcp.config import _load_base_settings
 
     # Save original environment
     original_env = os.environ.copy()
 
     # Clear settings cache before test to ensure fresh settings
-    get_settings.cache_clear()
+    _load_base_settings.cache_clear()
 
     try:
         yield
@@ -49,7 +49,7 @@ def _isolate_cli_environment() -> Generator[None, None, None]:
         os.environ.update(original_env)
 
         # Clear settings cache after test to prevent pollution
-        get_settings.cache_clear()
+        _load_base_settings.cache_clear()
 
 
 class TestCLIArgumentParsing:
@@ -57,7 +57,7 @@ class TestCLIArgumentParsing:
 
     def test_default_options(self) -> None:
         """Test CLI with default options."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -75,7 +75,7 @@ class TestCLIArgumentParsing:
 
     def test_sse_mode_options(self) -> None:
         """Test CLI with SSE mode and custom host/port."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -112,7 +112,7 @@ class TestCLIArgumentParsing:
 
     def test_streamable_http_mode_options(self) -> None:
         """Test CLI with streamable-http mode."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -150,8 +150,8 @@ class TestCLIArgumentParsing:
             assert result.exit_code == 0
 
     def test_streamable_http_mode_options_and_stateless(self) -> None:
-        """Test CLI with streamable-http mode."""
-        runner = CliRunner()
+        """Test CLI with streamable-http mode and --stateless-http flag."""
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -172,12 +172,12 @@ class TestCLIArgumentParsing:
                     "localhost",
                     "--port",
                     "8080",
-                    "--verbose",
                     "--stateless-http",
+                    "--verbose",
                 ],
             )
 
-            # Should start uvicorn with streamable-http transport
+            # Should start uvicorn with streamable-http transport and stateless_http=True
             mock_uvicorn.assert_called_once()
             call_args = mock_uvicorn.call_args
             assert call_args[1]["host"] == "localhost"
@@ -191,7 +191,7 @@ class TestCLIArgumentParsing:
 
     def test_verbose_logging_setup(self) -> None:
         """Test verbose logging configuration."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -216,7 +216,7 @@ class TestEnvironmentVariableHandling:
 
     def test_cli_args_set_environment_variables(self) -> None:
         """Test that CLI arguments properly set environment variables."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -241,7 +241,8 @@ class TestEnvironmentVariableHandling:
             )
 
             # Check environment variables were set
-            assert os.environ.get(f"{ENV_PREFIX}SDL_READ_LOGS_TOKEN") == "test-sdl-token"
+            # Note: Both --sdl-api-token and --graphql-service-token now map to CONSOLE_TOKEN
+            # When both are provided, --graphql-service-token (processed second) takes precedence
             assert os.environ.get(f"{ENV_PREFIX}CONSOLE_TOKEN") == "test-graphql-token"
             assert os.environ.get(f"{ENV_PREFIX}CONSOLE_BASE_URL") == "https://test-console.test"
             assert os.environ.get(f"{ENV_PREFIX}CONSOLE_GRAPHQL_ENDPOINT") == "/custom/graphql"
@@ -250,7 +251,7 @@ class TestEnvironmentVariableHandling:
 
     def test_environment_variables_from_env(self) -> None:
         """Test that environment variables are used when CLI args not provided."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -278,7 +279,7 @@ class TestConfigurationValidation:
 
     def test_configuration_validation_success(self) -> None:
         """Test successful configuration validation."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -299,7 +300,7 @@ class TestConfigurationValidation:
 
     def test_configuration_validation_failure(self) -> None:
         """Test configuration validation failure."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with patch("purple_mcp.cli.Settings") as mock_settings:
             # Mock configuration failure
@@ -318,7 +319,7 @@ class TestConfigurationValidation:
 
     def test_pydantic_validation_error(self) -> None:
         """Test handling of Pydantic validation errors."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with patch("purple_mcp.cli.Settings") as mock_settings:
             # Mock pydantic validation error
@@ -332,7 +333,7 @@ class TestConfigurationValidation:
 
     def test_create_settings_comprehensive_error_handling(self) -> None:
         """Test comprehensive error handling in _create_settings with all expected messages."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with patch("purple_mcp.cli.Settings") as mock_settings:
             # Mock Settings to raise a generic exception
@@ -363,7 +364,7 @@ class TestTransportModes:
 
     def test_stdio_mode(self) -> None:
         """Test STDIO transport mode."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -380,7 +381,7 @@ class TestTransportModes:
 
     def test_sse_mode(self) -> None:
         """Test SSE transport mode."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -408,7 +409,7 @@ class TestTransportModes:
 
     def test_streamable_http_mode(self) -> None:
         """Test streamable-http transport mode."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -434,18 +435,18 @@ class TestTransportModes:
 
     def test_invalid_mode(self) -> None:
         """Test handling of invalid transport mode."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         # Invalid mode should be caught by Click choice validation
         result = runner.invoke(main, ["--mode", "invalid"])
 
         # Click should reject invalid choice before our code runs
         assert result.exit_code != 0
-        assert "Invalid value for '--mode'" in result.output
+        assert "Invalid value for '--mode'" in result.stderr
 
     def test_case_insensitive_mode(self) -> None:
         """Test that transport mode is case insensitive."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -530,7 +531,7 @@ class TestErrorHandling:
 
     def test_server_import_error(self) -> None:
         """Test handling of server import errors."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with patch("purple_mcp.cli.Settings") as mock_settings:
             mock_settings.return_value = Mock()
@@ -558,7 +559,7 @@ class TestErrorHandling:
 
     def test_uvicorn_startup_error(self) -> None:
         """Test handling of uvicorn startup errors."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -580,7 +581,7 @@ class TestErrorHandling:
 
     def test_app_run_error(self) -> None:
         """Test handling of app.run errors in stdio mode."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -604,7 +605,7 @@ class TestCLIIntegration:
 
     def test_full_workflow_with_all_options(self) -> None:
         """Test complete workflow with all CLI options."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -652,7 +653,7 @@ class TestCLIIntegration:
 
     def test_help_output(self) -> None:
         """Test CLI help output."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         result = runner.invoke(main, ["--help"])
 
@@ -666,7 +667,7 @@ class TestCLIIntegration:
     @pytest.mark.parametrize("mode", ["stdio", "sse", "streamable-http"])
     def test_all_modes_with_valid_config(self, mode: str) -> None:
         """Test all transport modes with valid configuration."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -700,7 +701,7 @@ class TestSecurityValidation:
 
     def test_loopback_localhost_allowed_without_flag(self) -> None:
         """Test that localhost is allowed without --allow-remote-access flag."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -719,7 +720,7 @@ class TestSecurityValidation:
 
     def test_loopback_127_0_0_1_allowed_without_flag(self) -> None:
         """Test that 127.0.0.1 is allowed without --allow-remote-access flag."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -738,7 +739,7 @@ class TestSecurityValidation:
 
     def test_loopback_ipv6_allowed_without_flag(self) -> None:
         """Test that ::1 (IPv6 loopback) is allowed without --allow-remote-access flag."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -757,7 +758,7 @@ class TestSecurityValidation:
 
     def test_non_loopback_refused_without_flag(self) -> None:
         """Test that non-loopback addresses are refused without --allow-remote-access flag."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -778,7 +779,7 @@ class TestSecurityValidation:
 
     def test_public_ip_refused_without_flag(self) -> None:
         """Test that public IP addresses are refused without --allow-remote-access flag."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -797,7 +798,7 @@ class TestSecurityValidation:
 
     def test_non_loopback_allowed_with_flag(self) -> None:
         """Test that non-loopback addresses are allowed with --allow-remote-access flag."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -820,7 +821,7 @@ class TestSecurityValidation:
 
     def test_security_warning_displayed_for_non_loopback(self) -> None:
         """Test that security warning banner is displayed for non-loopback binding."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -845,7 +846,7 @@ class TestSecurityValidation:
 
     def test_streamable_http_mode_security_validation(self) -> None:
         """Test security validation works for streamable-http mode."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -863,7 +864,7 @@ class TestSecurityValidation:
 
     def test_stdio_mode_ignores_host_validation(self) -> None:
         """Test that stdio mode doesn't perform host validation."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,
@@ -881,7 +882,7 @@ class TestSecurityValidation:
 
     def test_case_insensitive_localhost(self) -> None:
         """Test that LOCALHOST is recognized as loopback."""
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
 
         with (
             patch("purple_mcp.cli.Settings") as mock_settings,

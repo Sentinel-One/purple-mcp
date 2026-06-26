@@ -4,9 +4,13 @@ from collections.abc import Callable
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastmcp.exceptions import ToolError
 
-from purple_mcp.libs.sdl import SDLHandlerError
-from purple_mcp.tools.sdl import _iso_to_nanoseconds, powerquery
+import purple_mcp.tools.sdl
+from purple_mcp.config import get_settings
+from purple_mcp.libs.sdl.sdl_exceptions import SDLHandlerError
+from purple_mcp.libs.sdl.sdl_powerquery_handler import SDLPowerQueryHandler
+from purple_mcp.tools.sdl import _get_s1_scope_header_value, _iso_to_nanoseconds, powerquery
 
 
 class TestPowerQuery:
@@ -19,16 +23,17 @@ class TestPowerQuery:
         """Test that powerquery validates end_datetime must be after start_datetime."""
         with patch("purple_mcp.tools.sdl.get_settings", return_value=mock_settings()):
             # Test with end_datetime before start_datetime
-            with pytest.raises(ValueError) as exc_info:
+            with pytest.raises(ToolError) as exc_info:
                 await powerquery(
                     query="test query",
                     start_datetime="2024-01-15T10:30:00Z",
                     end_datetime="2024-01-15T09:30:00Z",  # Earlier than start
                 )
 
+            # ToolError wraps the ValueError
+            assert "Error executing PowerQuery" in str(exc_info.value)
+            assert "ValueError" in str(exc_info.value)
             assert "end_datetime must be later than start_datetime" in str(exc_info.value)
-            assert "2024-01-15T10:30:00Z" in str(exc_info.value)
-            assert "2024-01-15T09:30:00Z" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_powerquery_validates_equal_times(
@@ -37,13 +42,15 @@ class TestPowerQuery:
         """Test that powerquery validates end_datetime must not equal start_datetime."""
         with patch("purple_mcp.tools.sdl.get_settings", return_value=mock_settings()):
             # Test with equal timestamps
-            with pytest.raises(ValueError) as exc_info:
+            with pytest.raises(ToolError) as exc_info:
                 await powerquery(
                     query="test query",
                     start_datetime="2024-01-15T10:30:00Z",
                     end_datetime="2024-01-15T10:30:00Z",  # Same as start
                 )
 
+            # ToolError wraps the ValueError
+            assert "Error executing PowerQuery" in str(exc_info.value)
             assert "end_datetime must be later than start_datetime" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -139,67 +146,12 @@ class TestPowerQuery:
             )
 
     @pytest.mark.asyncio
-    async def test_powerquery_propagates_sdl_handler_error(
-        self, mock_settings: Callable[..., MagicMock]
-    ) -> None:
-        """Test that SDLHandlerError is propagated to caller instead of returning error string."""
-        with (
-            patch("purple_mcp.tools.sdl.get_settings", return_value=mock_settings()),
-            patch("purple_mcp.tools.sdl.SDLPowerQueryHandler") as mock_handler_class,
-        ):
-            # Setup mock handler to raise SDLHandlerError
-            mock_handler = MagicMock()
-            mock_handler_class.return_value = mock_handler
-            mock_handler.submit_powerquery = AsyncMock()
-            mock_handler.poll_until_complete = AsyncMock(
-                side_effect=SDLHandlerError("Query execution failed")
-            )
-
-            # Verify that SDLHandlerError is raised, not returned as a string
-            with pytest.raises(SDLHandlerError) as exc_info:
-                await powerquery(
-                    query="test query",
-                    start_datetime="2024-01-15T09:30:00Z",
-                    end_datetime="2024-01-15T10:30:00Z",
-                )
-
-            assert "Query execution failed" in str(exc_info.value)
-
-    @pytest.mark.asyncio
-    async def test_powerquery_propagates_unexpected_exception(
-        self, mock_settings: Callable[..., MagicMock]
-    ) -> None:
-        """Test that unexpected exceptions are propagated to caller instead of returning error string."""
-        with (
-            patch("purple_mcp.tools.sdl.get_settings", return_value=mock_settings()),
-            patch("purple_mcp.tools.sdl.SDLPowerQueryHandler") as mock_handler_class,
-        ):
-            # Setup mock handler to raise unexpected exception
-            mock_handler = MagicMock()
-            mock_handler_class.return_value = mock_handler
-            mock_handler.submit_powerquery = AsyncMock()
-            mock_handler.poll_until_complete = AsyncMock(
-                side_effect=RuntimeError("Unexpected network error")
-            )
-
-            # Verify that RuntimeError is raised, not returned as a string
-            with pytest.raises(RuntimeError) as exc_info:
-                await powerquery(
-                    query="test query",
-                    start_datetime="2024-01-15T09:30:00Z",
-                    end_datetime="2024-01-15T10:30:00Z",
-                )
-
-            assert "Unexpected network error" in str(exc_info.value)
-
-    @pytest.mark.asyncio
     async def test_powerquery_logs_sdl_handler_error(
-        self, mock_settings: Callable[..., MagicMock]
+        self, mock_settings: Callable[..., MagicMock], caplog: pytest.LogCaptureFixture
     ) -> None:
-        """Test that SDLHandlerError is logged before being propagated."""
+        """Test that SDLHandlerError is logged before being wrapped in ToolError."""
         with (
             patch("purple_mcp.tools.sdl.get_settings", return_value=mock_settings()),
-            patch("purple_mcp.tools.sdl.logger") as mock_logger,
             patch("purple_mcp.tools.sdl.SDLPowerQueryHandler") as mock_handler_class,
         ):
             # Setup mock handler to raise SDLHandlerError
@@ -211,46 +163,18 @@ class TestPowerQuery:
             )
 
             # Execute and catch the exception
-            with pytest.raises(SDLHandlerError):
+            with pytest.raises(ToolError):
                 await powerquery(
                     query="test query",
                     start_datetime="2024-01-15T09:30:00Z",
                     end_datetime="2024-01-15T10:30:00Z",
                 )
 
-            # Verify that logger.exception was called
-            mock_logger.exception.assert_called_once_with(
-                "SDL handler error occurred during PowerQuery execution"
-            )
+            # Verify that logger.error was called with SDL handler error message
+            assert sum("SDL handler error occurred" in msg for msg in caplog.messages) == 1
 
-    @pytest.mark.asyncio
-    async def test_powerquery_logs_unexpected_exception(
-        self, mock_settings: Callable[..., MagicMock]
-    ) -> None:
-        """Test that unexpected exceptions are logged before being propagated."""
-        with (
-            patch("purple_mcp.tools.sdl.get_settings", return_value=mock_settings()),
-            patch("purple_mcp.tools.sdl.logger") as mock_logger,
-            patch("purple_mcp.tools.sdl.SDLPowerQueryHandler") as mock_handler_class,
-        ):
-            # Setup mock handler to raise unexpected exception
-            mock_handler = MagicMock()
-            mock_handler_class.return_value = mock_handler
-            mock_handler.submit_powerquery = AsyncMock()
-            mock_handler.poll_until_complete = AsyncMock(
-                side_effect=RuntimeError("Unexpected network error")
-            )
-
-            # Execute and catch the exception
-            with pytest.raises(RuntimeError):
-                await powerquery(
-                    query="test query",
-                    start_datetime="2024-01-15T09:30:00Z",
-                    end_datetime="2024-01-15T10:30:00Z",
-                )
-
-            # Verify that logger.exception was called
-            mock_logger.exception.assert_called_once_with("Unexpected error executing PowerQuery")
+            # Verify that logger.error was called with PowerQuery error message
+            assert sum("Error executing PowerQuery" in msg for msg in caplog.messages) == 1
 
     @pytest.mark.asyncio
     async def test_powerquery_cleanup_on_success(
@@ -300,84 +224,132 @@ class TestPowerQuery:
             mock_client.close.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_powerquery_cleanup_on_error_before_submission(
-        self, mock_settings: Callable[..., MagicMock]
+    async def test_powerquery_with_console_token_account_ids(
+        self, mock_settings: Callable[..., MagicMock], monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Test that client is closed when error occurs before query submission."""
+        """Test that powerquery passes tenant=False and account_ids when Console Token account IDs are configured."""
+        # Create settings with Console Token account IDs
+        settings = mock_settings()
+        settings.sdl_console_account_ids = ["426418030212073761", "123456789"]
+        settings.sdl_console_site_ids = None
+
+        monkeypatch.setattr(
+            purple_mcp.tools.sdl, name=get_settings.__name__, value=lambda: settings
+        )
+
         with (
-            patch("purple_mcp.tools.sdl.get_settings", return_value=mock_settings()),
-            patch("purple_mcp.tools.sdl.SDLPowerQueryHandler") as mock_handler_class,
+            patch(f"purple_mcp.tools.sdl.{SDLPowerQueryHandler.__name__}") as mock_handler_class,
         ):
-            # Setup mock handler to fail during submission
+            # Setup mock handler
             mock_handler = MagicMock()
             mock_handler_class.return_value = mock_handler
-            mock_handler.query_submitted = False
-            mock_handler.query_id = None
-            mock_handler.submit_powerquery = AsyncMock(
-                side_effect=SDLHandlerError("Submission failed")
+            mock_handler.is_result_partial.return_value = False
+            mock_handler.submit_powerquery = AsyncMock()
+            mock_handler.poll_until_complete = AsyncMock()
+
+            # Mock successful results
+            mock_results = MagicMock()
+            mock_results.match_count = 10
+            mock_results.columns = []
+            mock_results.values = [["test"]]
+            mock_results.warnings = None
+            mock_handler.poll_until_complete.return_value = mock_results
+
+            await powerquery(
+                query="test query",
+                start_datetime="2024-01-15T09:30:00Z",
+                end_datetime="2024-01-15T10:30:00Z",
             )
-            mock_handler.delete_query = AsyncMock()
 
-            # Mock the client
-            mock_client = MagicMock()
-            mock_client.is_closed.return_value = False
-            mock_client.close = AsyncMock()
-            mock_handler.sdl_query_client = mock_client
-
-            # Execute and catch the exception
-            with pytest.raises(SDLHandlerError):
-                await powerquery(
-                    query="test query",
-                    start_datetime="2024-01-15T09:30:00Z",
-                    end_datetime="2024-01-15T10:30:00Z",
-                )
-
-            # Verify cleanup was attempted
-            # Query was never submitted, so delete should not be called
-            mock_handler.delete_query.assert_not_called()
-            # But close should still be called
-            mock_client.close.assert_called_once()
+            # Verify submit_powerquery was called with tenant=False and account_ids
+            mock_handler.submit_powerquery.assert_called_once()
+            call_kwargs = mock_handler.submit_powerquery.call_args.kwargs
+            assert call_kwargs["tenant"] is False
+            assert call_kwargs["account_ids"] == ["426418030212073761", "123456789"]
 
     @pytest.mark.asyncio
-    async def test_powerquery_cleanup_on_error_after_submission(
-        self, mock_settings: Callable[..., MagicMock]
+    async def test_powerquery_without_console_token_account_ids(
+        self, mock_settings: Callable[..., MagicMock], monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Test that client is closed and query deleted when error occurs after submission."""
+        """Test that powerquery passes tenant=True and account_ids=[] when Console Token account IDs are not configured."""
+        # Create settings without Console Token account IDs
+        settings = mock_settings()
+        settings.sdl_console_account_ids = None
+        settings.sdl_console_site_ids = None
+
+        monkeypatch.setattr(
+            purple_mcp.tools.sdl, name=get_settings.__name__, value=lambda: settings
+        )
+
         with (
-            patch("purple_mcp.tools.sdl.get_settings", return_value=mock_settings()),
-            patch("purple_mcp.tools.sdl.SDLPowerQueryHandler") as mock_handler_class,
+            patch(f"purple_mcp.tools.sdl.{SDLPowerQueryHandler.__name__}") as mock_handler_class,
         ):
-            # Setup mock handler to fail during polling
+            # Setup mock handler
             mock_handler = MagicMock()
             mock_handler_class.return_value = mock_handler
-            mock_handler.query_submitted = True
-            mock_handler.query_id = "test-query-id"
-            mock_handler.is_query_completed.return_value = False
+            mock_handler.is_result_partial.return_value = False
             mock_handler.submit_powerquery = AsyncMock()
-            mock_handler.poll_until_complete = AsyncMock(
-                side_effect=SDLHandlerError("Polling failed")
+            mock_handler.poll_until_complete = AsyncMock()
+
+            # Mock successful results
+            mock_results = MagicMock()
+            mock_results.match_count = 10
+            mock_results.columns = []
+            mock_results.values = [["test"]]
+            mock_results.warnings = None
+            mock_handler.poll_until_complete.return_value = mock_results
+
+            await powerquery(
+                query="test query",
+                start_datetime="2024-01-15T09:30:00Z",
+                end_datetime="2024-01-15T10:30:00Z",
             )
-            mock_handler.delete_query = AsyncMock()
 
-            # Mock the client
-            mock_client = MagicMock()
-            mock_client.is_closed.return_value = False
-            mock_client.close = AsyncMock()
-            mock_handler.sdl_query_client = mock_client
+            # Verify submit_powerquery was called with tenant=True and account_ids=[]
+            # This enables global scope (all accessible accounts) for both Service and Console tokens
+            mock_handler.submit_powerquery.assert_called_once()
+            call_kwargs = mock_handler.submit_powerquery.call_args.kwargs
+            assert call_kwargs["tenant"] is True
+            assert call_kwargs["account_ids"] == []
 
-            # Execute and catch the exception
-            with pytest.raises(SDLHandlerError):
-                await powerquery(
-                    query="test query",
-                    start_datetime="2024-01-15T09:30:00Z",
-                    end_datetime="2024-01-15T10:30:00Z",
-                )
+    @pytest.mark.asyncio
+    async def test_powerquery_passes_configured_query_origin(
+        self, mock_settings: Callable[..., MagicMock], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that powerquery passes configured SDL query origin to the handler."""
+        query_origin = "purple_mcp"
+        settings = mock_settings()
+        settings.sdl_query_origin = query_origin
 
-            # Verify cleanup was called
-            # Query was submitted but not completed, so delete should be called
-            mock_handler.delete_query.assert_called_once()
-            # Close should also be called
-            mock_client.close.assert_called_once()
+        monkeypatch.setattr(
+            purple_mcp.tools.sdl, name=get_settings.__name__, value=lambda: settings
+        )
+
+        with (
+            patch(f"purple_mcp.tools.sdl.{SDLPowerQueryHandler.__name__}") as mock_handler_class,
+        ):
+            mock_handler = MagicMock()
+            mock_handler_class.return_value = mock_handler
+            mock_handler.is_result_partial.return_value = False
+            mock_handler.submit_powerquery = AsyncMock()
+            mock_handler.poll_until_complete = AsyncMock()
+
+            mock_results = MagicMock()
+            mock_results.match_count = 10
+            mock_results.columns = []
+            mock_results.values = [["test"]]
+            mock_results.warnings = None
+            mock_handler.poll_until_complete.return_value = mock_results
+
+            await powerquery(
+                query="test query",
+                start_datetime="2024-01-15T09:30:00Z",
+                end_datetime="2024-01-15T10:30:00Z",
+            )
+
+            mock_handler.submit_powerquery.assert_called_once()
+            call_kwargs = mock_handler.submit_powerquery.call_args.kwargs
+            assert call_kwargs["query_origin"] == query_origin
 
 
 class TestIsoToNanoseconds:
@@ -514,3 +486,57 @@ class TestIsoToNanoseconds:
 
         expected_ns = 1705296600000000000
         assert result == expected_ns
+
+    @pytest.mark.parametrize(
+        "account_ids, site_id, expected",
+        [
+            (None, None, None),
+            ([], None, None),
+            (["acc-1"], None, "acc-1"),
+            (["acc-1"], [], "acc-1"),
+            (["acc-1"], ["site-1"], "acc-1:site-1"),
+            (["acc-1"], ["site-1", "site-2"], "acc-1:site-1"),
+        ],
+    )
+    def test_to_scalyr_s1_scope_header_value(
+        self, account_ids: list[str] | None, site_id: list[str] | None, expected: str | None
+    ) -> None:
+        """ConsoleDetails.to_scalyr_s1_scope_header_value should join account/site ids or return None.
+
+        Args:
+            account_ids: Account IDs.
+            site_id: Site ID.
+            expected: Expected Scalyr S1 scope header value.
+        """
+        assert _get_s1_scope_header_value(account_ids, site_id) == expected
+
+    @pytest.mark.parametrize(
+        "account_ids, site_id, match",
+        [
+            (None, ["site-1"], "Site ID cannot be set without account ID"),
+            ([], ["site-1"], "Site ID cannot be set without account ID"),
+            (
+                ["acc-1", "acc-2"],
+                ["site-1"],
+                "Multiple accounts are not supported when site ID is set",
+            ),
+        ],
+    )
+    def test_to_scalyr_s1_scope_header_value_raises(
+        self,
+        account_ids: list[str] | None,
+        site_id: list[str] | None,
+        match: str,
+    ) -> None:
+        """Test get_s1_scope_header_value raises with invalid combination of account_ids and site_id.
+
+        Args:
+            account_ids: Account ID.
+            site_id: Site ID.
+            match: Expected error message.
+        """
+        with pytest.raises(ValueError, match=match):
+            _get_s1_scope_header_value(
+                account_ids=account_ids,
+                site_ids=site_id,
+            )

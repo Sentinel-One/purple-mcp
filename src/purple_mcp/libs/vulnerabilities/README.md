@@ -1,12 +1,17 @@
 # Vulnerabilities Library
 
-A standalone Python library for interacting with the SentinelOne Security Posture Management (XSPM) Vulnerabilities GraphQL API.
+A standalone Python library for interacting with the SentinelOne Security Posture Management (XSPM)
+Vulnerabilities GraphQL API.
 
 ## Overview
 
-This library provides a typed, async interface to the XSPM Vulnerabilities API, handling schema compatibility and providing robust error handling. It's designed to be completely independent and can be used outside of the MCP context.
+This library provides a typed, async interface to the XSPM Vulnerabilities API, handling schema
+compatibility and providing robust error handling. It's designed to be completely independent and
+can be used outside of the MCP context.
 
-> **📖 Read-Only Library**: This library provides read-only access to the vulnerabilities management system. It supports retrieving vulnerabilities, notes, and history, but does not include any data modification operations.
+> **📖 Read-Only Library**: This library provides read-only access to the vulnerabilities
+> management system. It supports retrieving vulnerabilities, notes, and history, but does not
+> include any data modification operations.
 
 ## Installation
 
@@ -22,7 +27,7 @@ from purple_mcp.libs.vulnerabilities import VulnerabilitiesClient, Vulnerabiliti
 
 async def main():
     config = VulnerabilitiesConfig(
-        graphql_url="https://console.example.com/web/api/v2.1/xspm/findings/vulnerabilities/graphql",
+        graphql_url="https://console.sentinelone.net/web/api/v2.1/xspm/findings/vulnerabilities/graphql",
         auth_token="your-bearer-token"
     )
 
@@ -62,7 +67,7 @@ asyncio.run(main())
 
 ```python
 config = VulnerabilitiesConfig(
-    graphql_url="https://console.example.com/web/api/v2.1/xspm/findings/vulnerabilities/graphql",
+    graphql_url="https://console.sentinelone.net/web/api/v2.1/xspm/findings/vulnerabilities/graphql",
     auth_token="your-bearer-token",
     timeout=30.0  # Optional
 )
@@ -71,6 +76,7 @@ config = VulnerabilitiesConfig(
 ## Filter System
 
 The library includes built-in DoS protection for filters:
+
 - Maximum 50 filters per request
 - Maximum 100 values per filter
 
@@ -87,10 +93,13 @@ vulnerabilities = await client.search_vulnerabilities(filters=filters, first=10)
 
 - `get_vulnerability(vulnerability_id: str)` - Retrieve a specific vulnerability by ID
 - `list_vulnerabilities(first: int = 10, after: str | None = None)` - List recent vulnerabilities
-- `search_vulnerabilities(filters: list[FilterInput] | None = None, first: int = 10, after: str | None = None)` - Search with filters
+- `search_vulnerabilities(filters: list[FilterInput] | None = None, first: int = 10, after: str | None = None)` -
+  Search with filters
 - `get_vulnerability_notes(vulnerability_id: str)` - Get notes for a vulnerability
-- `get_vulnerability_history(vulnerability_id: str, first: int = 10, after: str | None = None)` - View vulnerability activity history
+- `get_vulnerability_history(vulnerability_id: str, first: int = 10, after: str | None = None)` -
+  View vulnerability activity history
 
 ## Contributing
 
-This library follows the purple-mcp project's contribution guidelines. See the main project's CONTRIBUTING.md for details.
+This library follows the purple-mcp project's contribution guidelines. See the main project's
+CONTRIBUTING.md for details.

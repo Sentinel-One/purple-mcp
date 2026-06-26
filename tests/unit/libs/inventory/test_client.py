@@ -292,12 +292,10 @@ class TestInventoryClient:
 
         client = InventoryClient(config)
         async with client:
-            # 404 raises InventoryNotFoundError without wrapping
-            with pytest.raises(InventoryNotFoundError) as exc_info:
+            # 404 should raise InventoryNotFoundError (indicates misconfiguration)
+            # The API returns 200 with empty data for "no results found"
+            with pytest.raises(InventoryNotFoundError, match="Inventory resource not found"):
                 await client.list_inventory()
-
-            # The error message should contain info about the NotFoundError
-            assert "Inventory resource not found" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_handle_response_with_multiple_error_message_formats(

@@ -23,8 +23,8 @@ jobs:
 
       - name: Run ruff check
         run: |
-          uv run --group dev ruff check
+          uv run ruff check .
 
       - name: Run ruff format check
         run: |
-          uv run --group dev ruff format --check
+          uv run ruff format --check

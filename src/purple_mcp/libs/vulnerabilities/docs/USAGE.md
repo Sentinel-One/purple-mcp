@@ -2,7 +2,8 @@
 
 Comprehensive usage examples and patterns for the Vulnerabilities library.
 
-> **📖 Read-Only Library**: This library provides read-only access to the XSPM Vulnerabilities GraphQL API.
+> **📖 Read-Only Library**: This library provides read-only access to the XSPM Vulnerabilities
+> GraphQL API.
 
 ## Basic Operations
 
@@ -19,7 +20,7 @@ from purple_mcp.libs.vulnerabilities import (
 
 async def main() -> None:
     config = VulnerabilitiesConfig(
-        graphql_url="https://console.example.com/web/api/v2.1/xspm/findings/vulnerabilities/graphql",
+        graphql_url="https://console.sentinelone.net/web/api/v2.1/xspm/findings/vulnerabilities/graphql",
         auth_token="your-bearer-token",
     )
 
@@ -110,19 +111,21 @@ Vulnerability queries also support custom field selection.
 ### Available Fields
 
 Core scalars:
+
 - `id`, `name`, `severity`, `status`
 - `detectedAt`, `lastSeenAt`, `product`, `vendor`
 - `analystVerdict`, `exclusionPolicyId`
 
 Nested fragments:
+
 - `asset` &rarr; Asset identifiers plus cloud/kubernetes metadata
 - `scope` &rarr; Account/site/group hierarchy
 - `cve` &rarr; CVE metadata, scores, maturity, timeline
 - `software` &rarr; Installed software information
 - `assignee` &rarr; `id`, `email`, `fullName`
 
-Custom fragments support nested selections up to 8 brace levels, e.g.
-`"cve { id riskScore epssScore }"` or `"asset { cloudInfo { accountId region } }"`.
+You can use custom fragments with deeper nesting, e.g. `"cve { id riskScore epssScore }"` or
+`"asset { cloudInfo { accountId region } }"`.
 
 ### Examples
 
@@ -147,7 +150,8 @@ connection = await client.search_vulnerabilities(
 )
 ```
 
-> **Tip:** When you request only a subset of fields, unspecified attributes will be `None` on the resulting `Vulnerability` objects.
+> **Tip:** When you request only a subset of fields, unspecified attributes will be `None` on the
+> resulting `Vulnerability` objects.
 
 ## Pagination Patterns
 

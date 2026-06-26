@@ -1,13 +1,13 @@
 """Pydantic models for vulnerabilities data structures."""
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 # Enums
 
 
-class VulnerabilitySeverity(str, Enum):
+class VulnerabilitySeverity(StrEnum):
     """Vulnerability severity levels."""
 
     CRITICAL = "CRITICAL"
@@ -17,7 +17,7 @@ class VulnerabilitySeverity(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-class Status(str, Enum):
+class Status(StrEnum):
     """Vulnerability status values."""
 
     NEW = "NEW"
@@ -29,14 +29,14 @@ class Status(str, Enum):
     TO_BE_PATCHED = "TO_BE_PATCHED"
 
 
-class AnalystVerdict(str, Enum):
+class AnalystVerdict(StrEnum):
     """Analyst verdict for vulnerabilities."""
 
     TRUE_POSITIVE = "TRUE_POSITIVE"
     FALSE_POSITIVE = "FALSE_POSITIVE"
 
 
-class AssetCriticality(str, Enum):
+class AssetCriticality(StrEnum):
     """Asset criticality levels."""
 
     CRITICAL = "CRITICAL"
@@ -45,7 +45,7 @@ class AssetCriticality(str, Enum):
     LOW = "LOW"
 
 
-class OsType(str, Enum):
+class OsType(StrEnum):
     """Operating system types."""
 
     AIX = "AIX"
@@ -64,7 +64,7 @@ class OsType(str, Enum):
     WYSE = "WYSE"
 
 
-class HistoryEventType(str, Enum):
+class HistoryEventType(StrEnum):
     """History event types."""
 
     CREATION = "CREATION"
@@ -75,14 +75,14 @@ class HistoryEventType(str, Enum):
     WORKFLOW_ACTION = "WORKFLOW_ACTION"
 
 
-class SoftwareType(str, Enum):
+class SoftwareType(StrEnum):
     """Software types."""
 
     APP = "APP"
     OS = "OS"
 
 
-class ExploitMaturity(str, Enum):
+class ExploitMaturity(StrEnum):
     """Exploit code maturity levels."""
 
     FUNCTIONAL = "FUNCTIONAL"
@@ -92,7 +92,7 @@ class ExploitMaturity(str, Enum):
     UNPROVEN = "UNPROVEN"
 
 
-class RemediationLevel(str, Enum):
+class RemediationLevel(StrEnum):
     """Remediation level."""
 
     OFFICIAL_FIX = "OFFICIAL_FIX"
@@ -102,7 +102,7 @@ class RemediationLevel(str, Enum):
     WORKAROUND = "WORKAROUND"
 
 
-class ReportConfidence(str, Enum):
+class ReportConfidence(StrEnum):
     """Report confidence levels."""
 
     CONFIDENCE_NOT_DEFINED = "CONFIDENCE_NOT_DEFINED"
@@ -111,7 +111,7 @@ class ReportConfidence(str, Enum):
     REASONABLE = "REASONABLE"
 
 
-class AssetScopeLevel(str, Enum):
+class AssetScopeLevel(StrEnum):
     """Asset scope levels."""
 
     account = "account"

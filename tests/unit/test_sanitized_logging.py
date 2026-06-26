@@ -10,6 +10,7 @@ These tests exercise the real client code paths with mocked HTTP responses.
 import logging
 import os
 import uuid
+from collections.abc import Iterator
 
 import httpx
 import pytest
@@ -35,7 +36,7 @@ class TestSanitizedLogging:
         caplog.set_level(logging.DEBUG)
 
     @pytest.fixture(autouse=True)
-    def clear_env_var(self) -> None:
+    def clear_env_var(self) -> Iterator[None]:
         """Ensure PURPLEMCP_DEBUG_UNSAFE_LOGGING is not set."""
         if "PURPLEMCP_DEBUG_UNSAFE_LOGGING" in os.environ:
             del os.environ["PURPLEMCP_DEBUG_UNSAFE_LOGGING"]
@@ -68,15 +69,10 @@ class TestSanitizedLogging:
             graphql_url="https://test.test/v1/graphql",
             auth_token="test-token",
             user_details=PurpleAIUserDetails(
-                account_id="test",
-                team_token="test",
                 session_id=uuid.uuid4().hex,
-                email_address="test@test.test",
                 user_agent="test",
-                build_date="test",
-                build_hash="test",
             ),
-            console_details=PurpleAIConsoleDetails(base_url="https://test.test", version="test"),
+            console_details=PurpleAIConsoleDetails(base_url="https://test.test"),
         )
         client = PurpleAIClient(config)
 
@@ -127,15 +123,10 @@ class TestSanitizedLogging:
             graphql_url="https://test.test/v1/graphql",
             auth_token="test-token",
             user_details=PurpleAIUserDetails(
-                account_id="test",
-                team_token="test",
                 session_id=uuid.uuid4().hex,
-                email_address="test@test.test",
                 user_agent="test",
-                build_date="test",
-                build_hash="test",
             ),
-            console_details=PurpleAIConsoleDetails(base_url="https://test.test", version="test"),
+            console_details=PurpleAIConsoleDetails(base_url="https://test.test"),
         )
         client = PurpleAIClient(config)
 
@@ -172,16 +163,16 @@ class TestSanitizedLogging:
         async with InventoryClient(config) as client:
             # Search with sensitive filters
             filters = {
-                "name__contains": ["production-database-secret"],
+                "name__contains": ["testing-database-secret"],
                 "resourceType": ["Database Server"],
-                "tags__contains": ["env:production", "team:security"],
+                "tags__contains": ["env:testing", "team:security"],
             }
             await client.search_inventory(filters=filters)
 
         # Verify sensitive filter values are NOT in text logs
-        assert "production-database-secret" not in caplog.text
+        assert "testing-database-secret" not in caplog.text
         assert "Database Server" not in caplog.text
-        assert "env:production" not in caplog.text
+        assert "env:testing" not in caplog.text
         assert "team:security" not in caplog.text
 
         # Verify logging happened
@@ -193,9 +184,9 @@ class TestSanitizedLogging:
             if "filters" in record.__dict__:
                 # If filters exists, it should NOT contain sensitive filter values
                 filters_value = str(record.__dict__["filters"])
-                assert "production-database-secret" not in filters_value
+                assert "testing-database-secret" not in filters_value
                 assert "Database Server" not in filters_value
-                assert "env:production" not in filters_value
+                assert "env:testing" not in filters_value
                 assert "team:security" not in filters_value
 
     @pytest.mark.asyncio
@@ -218,14 +209,14 @@ class TestSanitizedLogging:
         async with InventoryClient(config) as client:
             # Search with sensitive filters - should fail with timeout
             filters = {
-                "name__contains": ["secret-production-server"],
+                "name__contains": ["secret-testing-server"],
                 "ip__contains": ["10.0.0.100"],
             }
             with pytest.raises(InventoryNetworkError):
                 await client.search_inventory(filters=filters)
 
         # Verify sensitive filter values are NOT in text exception logs
-        assert "secret-production-server" not in caplog.text
+        assert "secret-testing-server" not in caplog.text
         assert "10.0.0.100" not in caplog.text
 
         # Verify exception was logged
@@ -237,7 +228,7 @@ class TestSanitizedLogging:
             if "filters" in record.__dict__:
                 # If filters exists, it should NOT contain sensitive filter values
                 filters_value = str(record.__dict__["filters"])
-                assert "secret-production-server" not in filters_value
+                assert "secret-testing-server" not in filters_value
                 assert "10.0.0.100" not in filters_value
 
     @pytest.mark.asyncio
