@@ -757,3 +757,76 @@ class TestGetAlertHistory:
 
         assert result.page_info.has_previous_page is True
         assert result.total_count == 0
+
+
+class TestGetAlertInvestigationReport:
+    """Test get_alert_investigation_report method."""
+
+    @pytest.mark.asyncio
+    async def test_successful_get_report(
+        self, config: AlertsConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test successful investigation report retrieval."""
+        client = AlertsClient(config)
+        response_data: JsonDict = {
+            "aiInvestigations": [
+                {
+                    "alertId": "alert-123",
+                    "result": "# Investigation Report\nNo threats found.",
+                    "status": "COMPLETED",
+                    "verdict": "FALSE_POSITIVE",
+                    "timestamp": "2024-01-01T00:00:00Z",
+                    "purpleAiStatus": "DONE",
+                    "investigationStep": None,
+                }
+            ]
+        }
+
+        mock_execute_qry = AsyncMock(return_value=response_data)
+        monkeypatch.setattr(
+            client, AlertsClient.execute_compatible_query.__name__, mock_execute_qry
+        )
+
+        result = await client.get_alert_investigation_report("alert-123")
+
+        assert result is not None
+        assert result.alert_id == "alert-123"
+        assert result.result == "# Investigation Report\nNo threats found."
+        assert result.status == "COMPLETED"
+        assert result.verdict == "FALSE_POSITIVE"
+        assert result.timestamp == "2024-01-01T00:00:00Z"
+        assert result.purple_ai_status == "DONE"
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_empty_list(
+        self, config: AlertsConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that None is returned when no investigation exists."""
+        client = AlertsClient(config)
+        response_data: JsonDict = {"aiInvestigations": []}
+
+        mock_execute_qry = AsyncMock(return_value=response_data)
+        monkeypatch.setattr(
+            client, AlertsClient.execute_compatible_query.__name__, mock_execute_qry
+        )
+
+        result = await client.get_alert_investigation_report("alert-123")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_key_missing(
+        self, config: AlertsConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that None is returned when response lacks aiInvestigations key."""
+        client = AlertsClient(config)
+        response_data: JsonDict = {}
+
+        mock_execute_qry = AsyncMock(return_value=response_data)
+        monkeypatch.setattr(
+            client, AlertsClient.execute_compatible_query.__name__, mock_execute_qry
+        )
+
+        result = await client.get_alert_investigation_report("alert-123")
+
+        assert result is None

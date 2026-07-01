@@ -609,6 +609,8 @@ class AIInvestigation(BaseModel):
         restriction_reason: Reason the investigation was restricted, if applicable.
     """
 
+    model_config = _camel_case_model_config
+
     alert_id: str = Field(alias="alertId")
     result: str | None = None
     status: str | None = None
