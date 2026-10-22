@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "purple-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/Sentinel-One/purple-mcp.git",
+        "purple-mcp",
+        "--mode",
+        "stdio"
+      ],
+      "env": {
+        "PURPLEMCP_CONSOLE_TOKEN": "${PURPLEMCP_CONSOLE_TOKEN}",
+        "PURPLEMCP_CONSOLE_BASE_URL": "${PURPLEMCP_CONSOLE_BASE_URL}"
+      },
+      "variables": [
+        {
+          "name": "PURPLEMCP_CONSOLE_BASE_URL",
+          "title": "SentinelOne Console URL",
+          "description": "The full URL of your SentinelOne console, for example https://your-console.sentinelone.net"
+        },
+        {
+          "name": "PURPLEMCP_CONSOLE_TOKEN",
+          "title": "SentinelOne Console API Token",
+          "description": "The API token generated from your SentinelOne console."
+        }
+      ]
+    }
+  }
+}
