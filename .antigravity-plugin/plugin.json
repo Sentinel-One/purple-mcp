@@ -1,5 +1,29 @@
 {
   "$schema": "https://antigravity.google/schemas/v1/plugin.json",
-  "name": "SentinelOne-Purple-MCP",
-  "description": "Query your SentinelOne Singularity Console from Antigravity through a self-hosted, read-only Purple AI MCP server. Requires an active console deployment, your console URL, and an API token."
+  "name": "sentinelone-purple-mcp",
+  "displayName": "SentinelOne Purple AI",
+  "version": "0.7.0",
+  "description": "Query your SentinelOne Singularity Console from Antigravity through a self-hosted, read-only Purple AI MCP server. Requires an active console deployment, your console URL, and an API token.",
+  "logo": "assets/logo.svg",
+  "author": {
+    "name": "SentinelOne",
+    "url": "https://www.sentinelone.com"
+  },
+  "homepage": "https://github.com/Sentinel-One/purple-mcp",
+  "repository": "https://github.com/Sentinel-One/purple-mcp",
+  "license": "MIT",
+  "keywords": [
+    "sentinelone",
+    "purple-ai",
+    "security",
+    "edr",
+    "threat-hunting",
+    "soc",
+    "mcp"
+  ],
+  "suggestedPrompts": [
+    "Summarize the highest-severity open alerts in my SentinelOne console",
+    "Ask Purple AI which endpoints showed suspicious PowerShell activity this week",
+    "Show me the vulnerable applications in my SentinelOne inventory"
+  ]
 }
